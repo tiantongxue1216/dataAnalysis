@@ -1,0 +1,15 @@
+[
+  {
+    "id": "e7e67aa4-9403-4096-9b65-fdd1eb77a662",
+    "name": "本地测试数据库",
+    "type": "SQLite",
+    "host": null,
+    "port": null,
+    "database": "main",
+    "username": null,
+    "password": null,
+    "filePath": "D:\\qoderWS\\dataAnalysis\\smart_analyst.db",
+    "createdAt": "2026-04-12T05:22:56.891Z",
+    "updatedAt": "2026-04-12T05:22:56.891Z"
+  }
+]

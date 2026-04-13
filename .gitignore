@@ -1,0 +1,22 @@
+node_modules
+dist
+dist-ssr
+*.local
+
+# 后端相关文件
+server/node_modules
+server/.env
+server/data/**/*.db
+server/data/**/*.sqlite
+server/data/**/*.sqlite3
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
