@@ -29,14 +29,18 @@ export async function recognizeIntent(userInput, metadata = null) {
     console.log('[Intent Recognition] 规则匹配结果:', ruleMatch)
 
     if (ruleMatch.matched && isHighConfidence(ruleMatch.confidence)) {
-      // 高置信度规则匹配，直接处理
-      console.log('[Intent Recognition] 高置信度规则匹配，跳过LLM分类')
+      // 高置信度规则匹配，但仍需要 LLM 提取实体和推断槽位
+      console.log('[Intent Recognition] 高置信度规则匹配，使用 LLM 提取实体')
+
+      // 调用 LLM 进行实体识别和槽位推断
+      const classification = await classifyIntent(userInput)
+      console.log('[Intent Recognition] LLM 实体提取结果:', classification)
 
       const intentObject = extractAndFillSlots(
         userInput,
-        ruleMatch.intent,
-        [], // 规则引擎不提取实体，交给后续处理
-        null, // 没有 LLM 推断的槽位
+        ruleMatch.intent,  // 使用规则引擎的意图类型
+        classification.entities || [],  // 使用 LLM 提取的实体
+        classification.inferred_slots || null,  // 使用 LLM 推断的槽位
         metadata
       )
 
@@ -154,15 +158,28 @@ export async function recognizeIntent(userInput, metadata = null) {
     const ruleMatch = matchRules(userInput)
     if (ruleMatch.matched) {
       console.log('[Intent Recognition] 降级使用规则引擎结果')
+      
+      // 对于 COUNT 意图，自动填充 selectColumns
+      let missingSlots = ['select_columns', 'table_name']
+      let selectColumns = []
+      let aggregation = undefined
+      
+      if (ruleMatch.intent === 'COUNT') {
+        selectColumns = ['id']
+        aggregation = 'COUNT'
+        missingSlots = ['table_name']  // COUNT 不需要 select_columns
+      }
+      
       return {
         success: true,
         intent: {
           intent_type: ruleMatch.intent,
           confidence: 0.5, // 降低置信度
           entities: [],
-          select_columns: [],
+          select_columns: selectColumns,
           conditions: [],
-          missing_slots: ['select_columns', 'table_name'],
+          aggregation: aggregation,
+          missing_slots: missingSlots,
           reasoning: `LLM 调用失败，使用规则引擎结果 (${ruleMatch.rule_name})`,
         },
       }

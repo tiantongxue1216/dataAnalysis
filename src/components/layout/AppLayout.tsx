@@ -13,14 +13,23 @@ interface AppLayoutProps {
   onNewChat?: () => void
   sessions?: Session[]
   activeSessionId?: string
+  selectedDatasourceId?: string | null
+  onDatasourceChange?: (id: string) => void
 }
 
-export default function AppLayout({ children, onNewChat, sessions = [], activeSessionId }: AppLayoutProps) {
+export default function AppLayout({ 
+  children, 
+  onNewChat, 
+  sessions = [], 
+  activeSessionId,
+  selectedDatasourceId = null,
+  onDatasourceChange,
+}: AppLayoutProps) {
   return (
     <div className="h-screen w-screen flex bg-white">
       <Sidebar onNewChat={onNewChat} sessions={sessions} activeSessionId={activeSessionId} />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
+        <Header selectedDatasourceId={selectedDatasourceId} onDatasourceChange={onDatasourceChange || (() => {})} />
         <main className="flex-1 overflow-auto">
           {children}
         </main>

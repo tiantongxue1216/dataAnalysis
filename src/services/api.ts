@@ -169,3 +169,116 @@ export const sqlApi = {
     })
   },
 }
+
+/**
+ * 查询执行 API
+ */
+export const queryApi = {
+  /**
+   * 执行 SQL 查询并推荐图表
+   */
+  execute(sql: string, datasourceId: string, intentType?: string) {
+    return request<{ 
+      success: boolean
+      data?: any[]
+      recommendation?: {
+        chartType: string
+        reason: string
+        canRender: boolean
+        message?: string
+        xAxis?: string
+        yAxis?: string | string[]
+        groupBy?: string
+      }
+      rowCount?: number
+      error?: string
+    }>('/query/execute', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        sql,
+        datasource_id: datasourceId,
+        intent_type: intentType,
+      }),
+    })
+  },
+}
+
+/**
+ * Schema 信息 API
+ */
+export const schemaApi = {
+  /**
+   * 获取数据库 Schema 信息
+   */
+  getSchema() {
+    return request<{ 
+      success: boolean
+      data: {
+        tables: Array<{
+          name: string
+          description: string
+          dimensions: Array<{ name: string; description: string; type: string }>
+          measures: Array<{ name: string; column: string; aggregation: string; description: string; type: string }>
+          timeFields: Array<{ name: string; description: string }>
+        }>
+      }
+    }>('/schema')
+  },
+}
+
+/**
+ * Agent API
+ */
+export const agentApi = {
+  /**
+   * 使用 Agent 引擎执行查询
+   */
+  query(question: string, datasourceId: string, maxIterations?: number) {
+    return request<{ 
+      success: boolean
+      question: string
+      answer: string
+      thoughts: string[]
+      toolResults: Array<{
+        toolCallId: string
+        toolName: string
+        result: string
+        success: boolean
+      }>
+      iterations: number
+      duration: number
+      error?: string
+      // 图表相关数据
+      data?: Array<Record<string, any>>
+      recommendation?: {
+        chartType: string
+        reason: string
+        canRender: boolean
+        message?: string
+        xAxis?: string
+        yAxis?: string | string[]
+        groupBy?: string
+      }
+    }>('/agent/query', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        question,
+        datasource_id: datasourceId,
+        max_iterations: maxIterations,
+      }),
+    })
+  },
+
+  /**
+   * 获取可用工具列表
+   */
+  getTools() {
+    return request<{ 
+      success: boolean
+      data: Array<{
+        name: string
+        description: string
+      }>
+    }>('/agent/tools')
+  },
+}

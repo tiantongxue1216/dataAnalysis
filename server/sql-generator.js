@@ -8,6 +8,7 @@
  */
 
 import { callDeepSeekAPI } from './deepseek-client.js'
+import { generateSchemaDescription } from './db-schema.js'
 
 /**
  * SQL 片段模板库
@@ -52,20 +53,24 @@ const SQL_TEMPLATES = {
     const whereClauses = conditions.map(condition => {
       const { column, operator, value } = condition
       
+      // 判断值是否需要加引号（数字不需要，字符串需要）
+      const isNumeric = typeof value === 'number' || !isNaN(Number(value))
+      const quotedValue = isNumeric ? value : `'${value}'`
+      
       // 处理不同的操作符
       switch (operator) {
         case '=':
-          return `${column} = '${value}'`
+          return `${column} = ${quotedValue}`
         case '>':
-          return `${column} > ${value}`
+          return `${column} > ${quotedValue}`
         case '<':
-          return `${column} < ${value}`
+          return `${column} < ${quotedValue}`
         case '>=':
-          return `${column} >= ${value}`
+          return `${column} >= ${quotedValue}`
         case '<=':
-          return `${column} <= ${value}`
+          return `${column} <= ${quotedValue}`
         case '!=':
-          return `${column} != '${value}'`
+          return `${column} != ${quotedValue}`
         case 'LIKE':
           return `${column} LIKE '%${value}%'`
         case 'IN':
@@ -73,7 +78,7 @@ const SQL_TEMPLATES = {
         case 'BETWEEN':
           return `${column} BETWEEN ${value}`
         default:
-          return `${column} ${operator} '${value}'`
+          return `${column} ${operator} ${quotedValue}`
       }
     })
 
@@ -130,8 +135,19 @@ export function generateSQLByRules(intent, metadata = null) {
     // 构建 SQL 各部分
     const parts = []
 
+    // 0. 如果有 GROUP BY，确保 SELECT 中包含分组字段
+    let selectColumns = [...intent.select_columns]
+    if (intent.group_by && intent.group_by.length > 0) {
+      // 将 GROUP BY 字段添加到 SELECT 的开头
+      intent.group_by.forEach(groupCol => {
+        if (!selectColumns.includes(groupCol)) {
+          selectColumns.unshift(groupCol)
+        }
+      })
+    }
+
     // 1. SELECT 子句
-    parts.push(SQL_TEMPLATES.select(intent.select_columns, intent.aggregation))
+    parts.push(SQL_TEMPLATES.select(selectColumns, intent.aggregation))
 
     // 2. FROM 子句
     parts.push(SQL_TEMPLATES.from(intent.table_name))
@@ -382,7 +398,11 @@ function buildLLMPrompt(intent, metadata) {
 /**
  * LLM System Prompt
  */
+const SCHEMA_DESCRIPTION = generateSchemaDescription()
+
 const SYSTEM_PROMPT = `你是一个专业的 SQL 生成助手。你的任务是根据用户意图和表结构生成准确的 SQL 查询语句。
+
+${SCHEMA_DESCRIPTION}
 
 **核心能力**:
 1. 当表名未指定时，根据查询内容和字段名称智能推断最合适的表
@@ -397,21 +417,8 @@ const SYSTEM_PROMPT = `你是一个专业的 SQL 生成助手。你的任务是�
 5. 如果表名或字段名包含特殊字符，使用双引号包裹
 6. 确保生成的 SQL 是安全且可执行的
 7. 当表名缺失时，从提供的可用表列表中选择最合适的表
-
-**常见指标映射参考**:
-- 销售额、销量 → orders 表 (sales_amount, quantity)
-- 订单数 → orders 表 (order_id)
-- 用户数、客户数 → users 表 (user_id)
-- 产品、商品 → products 表 (product_name, product_id)
-- 利润 → orders 表 (profit)
-- 价格 → products 表 (price)
-
-**示例**:
-- 简单查询: SELECT sales_amount FROM orders;
-- 带条件: SELECT sales_amount FROM orders WHERE region = '华东';
-- 聚合查询: SELECT SUM(sales_amount) as sum_sales_amount FROM orders WHERE date >= '2024-01-01';
-- 分组查询: SELECT region, SUM(sales_amount) as sum_sales_amount FROM orders GROUP BY region;
-- 排序查询: SELECT product_name, sales_volume FROM products ORDER BY sales_volume DESC LIMIT 10;`
+8. **重要**: 时间字段统一使用 created_at，不要使用 date
+9. **重要**: 订单金额字段使用 total_amount，不要使用 sales_amount`
 
 /**
  * 从 LLM 响应中提取 SQL

@@ -3,8 +3,9 @@ import { MessageSquare, ArrowRight, BarChart3, Table as TableIcon, Target, Code,
 import ChatMessage from '@/components/chat/ChatMessage'
 import ChatInput from '@/components/chat/ChatInput'
 import LoadingIndicator from '@/components/chat/LoadingIndicator'
+import DataVisualization from '@/components/chart/DataVisualization'
 import type { Message } from '@/types/message'
-import { intentApi, sqlApi } from '@/services/api'
+import { intentApi, sqlApi, queryApi } from '@/services/api'
 
 const sampleQuestions = [
   '最近 12 个月的订单趋势',
@@ -14,9 +15,22 @@ const sampleQuestions = [
   '按地区统计用户数量排名',
 ]
 
-export default function HomePage() {
+export default function HomePage({ selectedDatasourceId }: { selectedDatasourceId: string | null }) {
   const [messages, setMessages] = useState<Message[]>([])
   const [isTyping, setIsTyping] = useState(false)
+  const [queryResult, setQueryResult] = useState<{
+    data: any[]
+    recommendation: {
+      chartType: string
+      reason: string
+      canRender: boolean
+      message?: string
+      xAxis?: string
+      yAxis?: string | string[]
+      groupBy?: string
+    } | null
+  } | null>(null)
+  const [currentChartType, setCurrentChartType] = useState<string>('table')
 
   const handleSendMessage = async (content: string) => {
     // 添加用户消息
@@ -95,13 +109,44 @@ export default function HomePage() {
           try {
             aiContent += '\n---\n\n💻 **正在生成 SQL...**\n'
             
-            const sqlResult = await sqlApi.generate(intent)
+            const sqlResult = await sqlApi.generate(intent, selectedDatasourceId || undefined)
             
             if (sqlResult.success && sqlResult.sql) {
               aiContent += `✅ **SQL 生成成功** (${sqlResult.method === 'rule-based' ? '规则引擎' : 'LLM'})\n\n`
               aiContent += '```sql\n'
               aiContent += sqlResult.sql + '\n'
               aiContent += '```\n'
+              
+              // 执行 SQL 查询并推荐图表
+              aiContent += '\n📊 **正在执行查询并推荐图表...**\n'
+              
+              if (!selectedDatasourceId) {
+                aiContent += '\n❌ **请先选择数据源**\n'
+              } else {
+                try {
+                  const queryResult = await queryApi.execute(
+                    sqlResult.sql,
+                    selectedDatasourceId,
+                    intent.intent_type
+                  )
+                  
+                  if (queryResult.success && queryResult.data) {
+                    aiContent += `✅ **查询成功**: 返回 ${queryResult.rowCount} 行数据\n\n`
+                    aiContent += `📈 **推荐图表**: ${queryResult.recommendation?.reason || '表格'}\n`
+                    
+                    // 更新可视化数据
+                    setQueryResult({
+                      data: queryResult.data,
+                      recommendation: queryResult.recommendation || null,
+                    })
+                    setCurrentChartType(queryResult.recommendation?.chartType || 'table')
+                  } else {
+                    aiContent += `❌ **查询失败**: ${queryResult.error || '未知错误'}\n`
+                  }
+                } catch (error: any) {
+                  aiContent += `\n❌ **查询执行错误**: ${error.message || '请检查数据源配置'}\n`
+                }
+              }
             } else {
               aiContent += `❌ **SQL 生成失败**: ${sqlResult.error || '未知错误'}\n`
             }
@@ -242,19 +287,30 @@ export default function HomePage() {
       </div>
 
       {/* 右侧数据分析结果区域 */}
-      <div className="w-1/2 flex flex-col items-center justify-center bg-gray-50 grid-bg">
-        <div className="text-center">
-          <div className="mb-4">
-            <div className="flex items-center justify-center gap-1 mb-4">
-              <div className="w-1 h-6 bg-primary/30 rounded-full animate-pulse" style={{ animationDelay: '0s' }}></div>
-              <div className="w-1 h-8 bg-primary/50 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-              <div className="w-1 h-10 bg-primary/70 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+      <div className="w-1/2 flex flex-col bg-gray-50 grid-bg">
+        {queryResult && queryResult.recommendation ? (
+          <DataVisualization
+            data={queryResult.data}
+            recommendation={queryResult.recommendation}
+            currentChartType={currentChartType}
+            onChartTypeChange={setCurrentChartType}
+          />
+        ) : (
+          <div className="flex-1 flex flex-col items-center justify-center">
+            <div className="text-center">
+              <div className="mb-4">
+                <div className="flex items-center justify-center gap-1 mb-4">
+                  <div className="w-1 h-6 bg-primary/30 rounded-full animate-pulse" style={{ animationDelay: '0s' }}></div>
+                  <div className="w-1 h-8 bg-primary/50 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-1 h-10 bg-primary/70 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                </div>
+              </div>
+              <p className="text-gray-400 text-sm font-medium tracking-wider uppercase">
+                Waiting for insight
+              </p>
             </div>
           </div>
-          <p className="text-gray-400 text-sm font-medium tracking-wider uppercase">
-            Waiting for insight
-          </p>
-        </div>
+        )}
       </div>
     </div>
   )

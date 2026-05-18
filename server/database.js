@@ -69,6 +69,102 @@ class DatabaseConnectionManager {
   }
 
   /**
+   * 执行 SQL 查询
+   * @param {Object} config - 数据源配置
+   * @param {string} sql - SQL 查询语句
+   * @returns {Array} 查询结果
+   */
+  executeQuery(config, sql) {
+    const { type, host, port, database, username, password, filePath } = config
+
+    try {
+      switch (type) {
+        case 'SQLite':
+          return this.executeSQLite(filePath || database, sql)
+        
+        case 'MySQL':
+          return this.executeMySQL({ host, port, database, username, password }, sql)
+        
+        case 'PostgreSQL':
+          return this.executePostgreSQL({ host, port, database, username, password }, sql)
+        
+        default:
+          throw new Error(`不支持的数据库类型: ${type}`)
+      }
+    } catch (error) {
+      throw error
+    }
+  }
+
+  /**
+   * 执行 SQLite 查询
+   */
+  executeSQLite(filePath, sql) {
+    try {
+      if (!fs.existsSync(filePath)) {
+        throw new Error(`数据库文件不存在: ${filePath}`)
+      }
+
+      const db = new DatabaseSync(filePath, { readOnly: true })
+      
+      // 执行查询
+      const stmt = db.prepare(sql)
+      const result = stmt.all()
+      
+      db.close()
+      
+      return result
+    } catch (error) {
+      throw new Error(`SQLite 查询失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 执行 MySQL 查询
+   */
+  async executeMySQL(config, sql) {
+    try {
+      const connection = await mysql.createConnection({
+        host: config.host,
+        port: parseInt(config.port) || 3306,
+        user: config.username,
+        password: config.password,
+        database: config.database,
+      })
+
+      const [rows] = await connection.query(sql)
+      await connection.end()
+
+      return rows
+    } catch (error) {
+      throw new Error(`MySQL 查询失败: ${error.message}`)
+    }
+  }
+
+  /**
+   * 执行 PostgreSQL 查询
+   */
+  async executePostgreSQL(config, sql) {
+    try {
+      const client = new pg.Client({
+        host: config.host,
+        port: parseInt(config.port) || 5432,
+        user: config.username,
+        password: config.password,
+        database: config.database,
+      })
+
+      await client.connect()
+      const result = await client.query(sql)
+      await client.end()
+
+      return result.rows
+    } catch (error) {
+      throw new Error(`PostgreSQL 查询失败: ${error.message}`)
+    }
+  }
+
+  /**
    * 测试 MySQL 连接
    */
   async testMySQL(config) {

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
-import AppLayout from './components/layout/AppLayout'
-import HomePage from './pages/HomePage'
+import NewAppLayout from './components/layout/NewAppLayout'
+import NewHomePage from './pages/NewHomePage'
 import DataSourcePage from './pages/DataSourcePage'
 
 interface Session {
@@ -14,6 +14,7 @@ interface Session {
 function App() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [activeSessionId, setActiveSessionId] = useState<string | undefined>()
+  const [selectedDatasourceId, setSelectedDatasourceId] = useState<string | null>(null)
 
   const handleNewChat = () => {
     const newSession: Session = {
@@ -28,12 +29,21 @@ function App() {
 
   return (
     <BrowserRouter>
-      <AppLayout onNewChat={handleNewChat} sessions={sessions} activeSessionId={activeSessionId}>
+      <NewAppLayout 
+        onNewChat={handleNewChat} 
+        sessions={sessions} 
+        activeSessionId={activeSessionId}
+        selectedDatasourceId={selectedDatasourceId}
+        onDatasourceChange={setSelectedDatasourceId}
+      >
         <Routes>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<NewHomePage 
+            selectedDatasourceId={selectedDatasourceId} 
+            onDatasourceChange={setSelectedDatasourceId}
+          />} />
           <Route path="/datasource" element={<DataSourcePage />} />
         </Routes>
-      </AppLayout>
+      </NewAppLayout>
     </BrowserRouter>
   )
 }

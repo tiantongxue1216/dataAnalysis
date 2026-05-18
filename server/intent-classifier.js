@@ -50,7 +50,7 @@ const SYSTEM_PROMPT = `你是一个专业的数据分析助手，负责理解用
   "confidence": 0.95,
   "entities": [
     {"entity_type": "TIME", "value": "上个月", "normalized": "2024-03", "inferred": false},
-    {"entity_type": "METRIC", "value": "销售额", "column_name": "sales_amount", "inferred": false}
+    {"entity_type": "METRIC", "value": "销售额", "column_name": "total_amount", "inferred": false}
   ],
   "inferred_slots": {
     "table_name": "orders",
@@ -58,6 +58,12 @@ const SYSTEM_PROMPT = `你是一个专业的数据分析助手，负责理解用
   },
   "reasoning": "简要说明分类理由、实体识别过程和槽位推断逻辑"
 }
+
+**重要提示**:
+- 时间字段统一使用 created_at（所有表）
+- 订单金额字段使用 total_amount（orders 表）
+- 产品单价使用 unit_price（order_items 表）
+- 不要使用 date、sales_amount、price 等不存在的字段
 
 要求：
 1. confidence 是一个 0-1 之间的数字，表示你对分类结果的信心程度
