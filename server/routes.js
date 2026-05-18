@@ -2,11 +2,15 @@ import express from 'express'
 import cors from 'cors'
 import storage from './storage.js'
 import databaseManager from './database.js'
-import { recognizeIntent, clarifyIntent } from './intent-service.js'
-import { generateSQL } from './sql-generator.js'
+// 注意：旧的意图识别和 SQL 生成模块已被 LangChain NL2SQL Agent 替代
+// import { recognizeIntent, clarifyIntent } from './intent-service.js'
+// import { generateSQL } from './sql-generator.js'
 import { executeAndRecommend } from './query-executor.js'
 import { DATABASE_SCHEMA } from './db-schema.js'
 import { createAgent } from './agent/index.js'
+// 新的 NL2SQL Agent
+import { createNL2SQLAgent } from './nl2sql-agent.js'
+import { testConnection as lcTestConnection, getDatabaseMetadata as lcGetMetadata } from './langchain-sql-database.js'
 
 const app = express()
 
@@ -146,7 +150,7 @@ app.delete('/api/datasources/:id', (req, res) => {
 // ==================== 数据库连接测试 API ====================
 
 /**
- * 测试数据库连接
+ * 测试数据库连接（使用 LangChain SQLDatabase）
  * POST /api/datasources/test
  */
 app.post('/api/datasources/test', async (req, res) => {
@@ -161,15 +165,23 @@ app.post('/api/datasources/test', async (req, res) => {
       })
     }
 
-    const result = await databaseManager.testConnection(config)
-    res.json({ success: true, data: result })
+    // 优先使用 LangChain SQLDatabase 进行测试
+    try {
+      const result = await lcTestConnection(config)
+      res.json({ success: true, data: result })
+    } catch (lcError) {
+      console.warn('[API] LangChain 连接测试失败，回退到传统方式:', lcError.message)
+      // 回退到原有的测试方式
+      const result = await databaseManager.testConnection(config)
+      res.json({ success: true, data: result })
+    }
   } catch (error) {
     res.status(400).json({ success: false, error: error.message })
   }
 })
 
 /**
- * 获取数据库元数据
+ * 获取数据库元数据（使用 LangChain SQLDatabase）
  * POST /api/datasources/metadata
  */
 app.post('/api/datasources/metadata', async (req, res) => {
@@ -183,46 +195,36 @@ app.post('/api/datasources/metadata', async (req, res) => {
       })
     }
 
-    const metadata = await databaseManager.getMetadata(config)
-    res.json({ success: true, data: metadata })
+    // 优先使用 LangChain SQLDatabase 获取元数据
+    try {
+      const metadata = await lcGetMetadata(config)
+      res.json({ success: true, data: metadata })
+    } catch (lcError) {
+      console.warn('[API] LangChain 元数据获取失败，回退到传统方式:', lcError.message)
+      // 回退到原有的方式
+      const metadata = await databaseManager.getMetadata(config)
+      res.json({ success: true, data: metadata })
+    }
   } catch (error) {
     res.status(400).json({ success: false, error: error.message })
   }
 })
 
-// ==================== 意图识别 API ====================
+// ==================== 意图识别 API (已废弃，使用 /api/nl2sql/query) ====================
 
 /**
- * 意图识别主接口
+ * 意图识别主接口（已废弃）
  * POST /api/intent/recognize
+ * @deprecated 请使用 /api/nl2sql/query 替代
  */
 app.post('/api/intent/recognize', async (req, res) => {
   try {
-    const { query } = req.body
-
-    if (!query || typeof query !== 'string') {
-      return res.status(400).json({
-        success: false,
-        error: '查询内容不能为空',
-      })
-    }
-
-    // 获取数据源元数据（优先使用 Schema 配置）
-    const metadata = {
-      tables: Object.values(DATABASE_SCHEMA).map(schema => ({
-        name: schema.name,
-        columns: Object.entries(schema.columns).map(([name, info]) => ({
-          name,
-          type: info.type,
-          description: info.description,
-          primaryKey: info.primaryKey || false,
-        })),
-      })),
-      totalTables: Object.keys(DATABASE_SCHEMA).length,
-    }
-
-    const result = await recognizeIntent(query, metadata)
-    res.json(result)
+    console.warn('[API] ⚠️  /api/intent/recognize 已废弃，请使用 /api/nl2sql/query')
+    return res.status(410).json({
+      success: false,
+      error: '此接口已废弃，请使用 /api/nl2sql/query 进行自然语言查询',
+      migration_guide: 'POST /api/nl2sql/query { question, datasource_id }'
+    })
   } catch (error) {
     console.error('[API] 意图识别失败:', error)
     res.status(500).json({
@@ -233,33 +235,20 @@ app.post('/api/intent/recognize', async (req, res) => {
 })
 
 /**
- * 澄清对话接口
+ * 澄清对话接口（已废弃）
  * POST /api/intent/clarify
+ * @deprecated 请使用 /api/nl2sql/query 替代
  */
 app.post('/api/intent/clarify', async (req, res) => {
   try {
-    const { query, missing_slots, user_response, partial_intent } = req.body
-
-    if (!query || !missing_slots || !user_response) {
-      return res.status(400).json({
-        success: false,
-        error: '缺少必要参数: query, missing_slots, user_response',
-      })
-    }
-
-    // TODO: 获取元数据
-    const metadata = null
-
-    const result = await clarifyIntent(
-      query,
-      missing_slots,
-      user_response,
-      partial_intent,
-      metadata
-    )
-    res.json(result)
+    console.warn('[API] ⚠️  /api/intent/clarify 已废弃，请使用 /api/nl2sql/query')
+    return res.status(410).json({
+      success: false,
+      error: '此接口已废弃，请使用 /api/nl2sql/query 进行自然语言查询',
+      migration_guide: 'POST /api/nl2sql/query { question, datasource_id }'
+    })
   } catch (error) {
-    console.error('[API] 澄清对话失败:', error)
+    console.error('[API] 澄清对话处理失败:', error)
     res.status(500).json({
       success: false,
       error: error.message || '澄清对话处理失败',
@@ -267,58 +256,21 @@ app.post('/api/intent/clarify', async (req, res) => {
   }
 })
 
-// ==================== SQL 生成 API ====================
+// ==================== SQL 生成 API (已废弃) ====================
 
 /**
- * 生成 SQL 查询
+ * 生成 SQL 查询（已废弃）
  * POST /api/sql/generate
+ * @deprecated 请使用 /api/nl2sql/query 替代
  */
 app.post('/api/sql/generate', async (req, res) => {
   try {
-    const { intent, datasource_id, metadata: directMetadata } = req.body
-
-    if (!intent) {
-      return res.status(400).json({
-        success: false,
-        error: '意图对象不能为空',
-      })
-    }
-
-    // 获取数据源元数据
-    let metadata = directMetadata || null // 优先使用直接传入的元数据
-    
-    // 如果没有元数据，使用 Schema 配置
-    if (!metadata) {
-      metadata = {
-        tables: Object.values(DATABASE_SCHEMA).map(schema => ({
-          name: schema.name,
-          columns: Object.entries(schema.columns).map(([name, info]) => ({
-            name,
-            type: info.type,
-            description: info.description,
-            primaryKey: info.primaryKey || false,
-          })),
-        })),
-        totalTables: Object.keys(DATABASE_SCHEMA).length,
-      }
-    } else if (datasource_id && !directMetadata) {
-      // 如果有 datasource_id，尝试从数据库获取实际元数据
-      const datasource = storage.getById(datasource_id)
-      if (datasource) {
-        try {
-          const dbMetadata = await databaseManager.getMetadata(datasource)
-          console.log('[API] 获取到数据库元数据:', dbMetadata.totalTables, '个表')
-          metadata = dbMetadata // 使用实际数据库元数据覆盖
-        } catch (error) {
-          console.warn('[API] 获取数据库元数据失败，使用 Schema 配置:', error.message)
-          // 继续使用 Schema 配置的元数据
-        }
-      }
-    }
-
-    // 生成 SQL
-    const result = await generateSQL(intent, metadata)
-    res.json(result)
+    console.warn('[API] ⚠️  /api/sql/generate 已废弃，请使用 /api/nl2sql/query')
+    return res.status(410).json({
+      success: false,
+      error: '此接口已废弃，请使用 /api/nl2sql/query 进行自然语言查询',
+      migration_guide: 'POST /api/nl2sql/query { question, datasource_id }'
+    })
   } catch (error) {
     console.error('[API] SQL 生成失败:', error)
     res.status(500).json({
@@ -608,6 +560,67 @@ app.post('/api/agent/query', async (req, res) => {
     res.status(500).json({
       success: false,
       error: error.message || 'Agent 查询失败'
+    })
+  }
+})
+
+/**
+ * NL2SQL Agent 查询接口（新）
+ * POST /api/nl2sql/query
+ * 使用 LangChain ReAct Agent 执行自然语言到 SQL 的转换
+ */
+app.post('/api/nl2sql/query', async (req, res) => {
+  try {
+    const { question, datasource_id, max_iterations, top_k } = req.body
+
+    if (!question) {
+      return res.status(400).json({
+        success: false,
+        error: '问题不能为空'
+      })
+    }
+
+    if (!datasource_id) {
+      return res.status(400).json({
+        success: false,
+        error: '数据源 ID 不能为空'
+      })
+    }
+
+    console.log('[NL2SQL API] 收到 NL2SQL 查询请求:', question)
+    console.log('[NL2SQL API] 数据源 ID:', datasource_id)
+
+    // 获取数据源配置
+    const datasource = storage.getById(datasource_id)
+    if (!datasource) {
+      return res.status(404).json({
+        success: false,
+        error: '数据源不存在'
+      })
+    }
+
+    // 创建 NL2SQL Agent 实例
+    const nl2sqlAgent = createNL2SQLAgent()
+
+    // 执行查询
+    const result = await nl2sqlAgent.execute(question, datasource, {
+      topK: top_k || 5,
+      maxIterations: max_iterations || 10
+    })
+
+    console.log('[NL2SQL API] 执行结果:', JSON.stringify({
+      success: result.success,
+      answer: result.answer ? result.answer.substring(0, 100) : 'undefined',
+      iterations: result.iterations,
+      error: result.error
+    }, null, 2))
+
+    res.json(result)
+  } catch (error) {
+    console.error('[NL2SQL API] 查询失败:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message || 'NL2SQL 查询失败'
     })
   }
 })

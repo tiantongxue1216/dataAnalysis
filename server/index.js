@@ -29,6 +29,7 @@ app.listen(PORT, () => {
 ║  POST   /api/query/execute             ║
 ║  GET    /api/schema                    ║
 ║  POST   /api/agent/query               ║
+║  POST   /api/nl2sql/query (NEW)       ║
 ║  GET    /api/agent/tools               ║
 ║  GET    /api/health                    ║
 ║                                         ║
