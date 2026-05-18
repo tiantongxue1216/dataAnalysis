@@ -21,7 +21,7 @@ import {
   CheckCircle,
   AlertCircle
 } from 'lucide-react'
-import { intentApi, sqlApi, queryApi, dataSourceApi, agentApi } from '@/services/api'
+import { intentApi, sqlApi, queryApi, dataSourceApi, agentApi, nl2sqlApi } from '@/services/api'
 import type { Message } from '@/types/message'
 import type { DataSource } from '@/types/datasource'
 import DataVisualization from '@/components/chart/DataVisualization'
@@ -76,6 +76,7 @@ export default function NewHomePage({
   const [datasources, setDatasources] = useState<DataSource[]>([])
   const [currentChartTypes, setCurrentChartTypes] = useState<{[key: string]: string}>({})
   const [useAgentMode, setUseAgentMode] = useState(false)
+  const [useNL2SQLMode, setUseNL2SQLMode] = useState(true) // 默认使用新的 NL2SQL API
   const [availableTools, setAvailableTools] = useState<Array<{name: string; description: string}>>([])
 
   useEffect(() => {
@@ -136,7 +137,10 @@ export default function NewHomePage({
       const startTime = Date.now()
       
       // 根据模式选择不同的处理逻辑
-      if (useAgentMode && selectedDatasourceId) {
+      if (useNL2SQLMode && selectedDatasourceId) {
+        // 使用新的 NL2SQL Agent API（推荐）
+        await handleNL2SQLQuery(content, startTime)
+      } else if (useAgentMode && selectedDatasourceId) {
         // Agent 模式：直接调用 Agent API
         await handleAgentQuery(content, startTime)
       } else {
@@ -214,6 +218,78 @@ export default function NewHomePage({
       setMessages(prev => [...prev, aiMessage])
     } catch (error: any) {
       console.error('Agent 查询失败:', error)
+      
+      // 显示错误消息
+      const errorMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: `❌ 查询失败: ${error.message || '未知错误'}`,
+        timestamp: new Date(),
+        thinking: `错误: ${error.stack || error.message}`,
+        duration: parseFloat(((Date.now() - startTime) / 1000).toFixed(3)),
+        agentMode: true,
+      }
+      setMessages(prev => [...prev, errorMessage])
+    }
+  }
+
+  /**
+   * NL2SQL Agent 模式查询（新）
+   */
+  const handleNL2SQLQuery = async (content: string, startTime: number) => {
+    try {
+      const nl2sqlResult = await nl2sqlApi.query(
+        content,
+        selectedDatasourceId!,
+        { topK: 5, maxIterations: 10 }
+      )
+
+      // 检查返回结果
+      if (!nl2sqlResult || !nl2sqlResult.success) {
+        throw new Error(nl2sqlResult?.error || 'NL2SQL 查询失败')
+      }
+
+      const duration = ((Date.now() - startTime) / 1000).toFixed(3)
+
+      // 构建思考过程
+      let thoughts = nl2sqlResult.thoughts || []
+      
+      // 去重
+      thoughts = thoughts.filter((thought, index) => {
+        if (index === 0) return true
+        return thought !== thoughts[index - 1]
+      })
+      
+      // 格式化思考过程
+      const thinkingLines = [
+        `🚀 NL2SQL Agent 执行完成`,
+        `━━━━━━━━━━━━━━━━━━━━━━━`,
+        `迭代次数: ${nl2sqlResult.iterations || 0}`,
+        `耗时: ${duration}秒`,
+        `数据库类型: ${nl2sqlResult.metadata?.dialect || '未知'}`,
+        ``,
+        `📝 思考过程:`,
+        `───────────────────────`,
+        ...thoughts.map((t, i) => `${i + 1}. ${t}`),
+      ]
+      
+      const thinking = thinkingLines.join('\n')
+
+      const aiMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: nl2sqlResult.answer || '抱歉，未能生成回答',
+        timestamp: new Date(),
+        thinking,
+        duration: parseFloat(duration),
+        agentMode: true,
+        // 添加图表数据
+        data: nl2sqlResult.data?.rows || undefined,
+        recommendation: nl2sqlResult.recommendation || undefined,
+      }
+      setMessages(prev => [...prev, aiMessage])
+    } catch (error: any) {
+      console.error('NL2SQL 查询失败:', error)
       
       // 显示错误消息
       const errorMessage: ChatMessage = {
@@ -412,6 +488,24 @@ export default function NewHomePage({
             
             {/* 底部工具栏 */}
             <div className="flex items-center gap-3 mt-3">
+              {/* NL2SQL 模式切换（新） */}
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
+                <Sparkles className="w-4 h-4 text-purple-600" />
+                <span className="text-sm font-medium text-purple-700">NL2SQL (推荐)</span>
+                <button
+                  onClick={() => setUseNL2SQLMode(!useNL2SQLMode)}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                    useNL2SQLMode ? 'bg-purple-600' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      useNL2SQLMode ? 'translate-x-4' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+
               {/* Agent 模式切换 */}
               <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg">
                 <span className="text-sm text-gray-600">Agent 模式</span>

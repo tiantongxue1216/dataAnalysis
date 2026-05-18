@@ -282,3 +282,60 @@ export const agentApi = {
     }>('/agent/tools')
   },
 }
+
+/**
+ * NL2SQL Agent API（新）
+ * 基于 LangChain ReAct Agent 的自然语言查询接口
+ */
+export const nl2sqlApi = {
+  /**
+   * 执行自然语言到 SQL 的查询
+   * @param question - 用户问题
+   * @param datasourceId - 数据源 ID
+   * @param options - 可选参数
+   * @returns 查询结果
+   */
+  query(
+    question: string, 
+    datasourceId: string, 
+    options?: {
+      topK?: number
+      maxIterations?: number
+    }
+  ) {
+    return request<{ 
+      success: boolean
+      question: string
+      answer: string
+      thoughts: string[]
+      data?: {
+        rows: Array<Record<string, any>>
+        rowCount: number
+      }
+      recommendation?: {
+        chartType: string
+        reason: string
+        canRender: boolean
+        message?: string
+        xAxis?: string
+        yAxis?: string | string[]
+        groupBy?: string
+      }
+      iterations: number
+      duration: number
+      error?: string
+      metadata?: {
+        dialect: string
+        tools_used: string[]
+      }
+    }>('/nl2sql/query', {
+      method: 'POST',
+      body: JSON.stringify({ 
+        question,
+        datasource_id: datasourceId,
+        top_k: options?.topK || 5,
+        max_iterations: options?.maxIterations || 10,
+      }),
+    })
+  },
+}

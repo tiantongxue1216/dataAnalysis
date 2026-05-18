@@ -1,16 +1,79 @@
 /**
- * LangChain SQLDatabase 适配器
- * 基于 langchain-community 的 SQLDatabase 封装
+ * 简化版 SQLDatabase 适配器
+ * 由于 @langchain/community 的 SQLDatabase 可能不兼容，使用自定义实现
  * 支持 SQLite、MySQL、PostgreSQL
  */
 
-import { SQLDatabase } from '@langchain/community/sql_db'
 import { DataSource } from 'typeorm'
+import databaseManager from './database.js'
+
+/**
+ * 简化的 SQLDatabase 类（模拟 LangChain 的接口）
+ */
+class SimpleSQLDatabase {
+  constructor(dataSource) {
+    this.dataSource = dataSource
+    this.appDataSource = dataSource
+  }
+
+  /**
+   * 获取可用的表名列表
+   */
+  async getUsableTableNames() {
+    const queryRunner = this.dataSource.createQueryRunner()
+    try {
+      const tables = await queryRunner.getTables()
+      return tables.map(t => t.name)
+    } finally {
+      await queryRunner.release()
+    }
+  }
+
+  /**
+   * 获取表的详细信息
+   */
+  async getTableInfo(tableNames) {
+    const queryRunner = this.dataSource.createQueryRunner()
+    try {
+      const info = {}
+      for (const tableName of tableNames) {
+        const table = await queryRunner.getTable(tableName)
+        if (table) {
+          info[tableName] = {
+            name: tableName,
+            columns: table.columns.map(col => ({
+              name: col.name,
+              type: col.type,
+              nullable: col.isNullable,
+              primaryKey: col.isPrimary,
+            })),
+          }
+        }
+      }
+      return info
+    } finally {
+      await queryRunner.release()
+    }
+  }
+
+  /**
+   * 执行 SQL 查询
+   */
+  async run(sql) {
+    const queryRunner = this.dataSource.createQueryRunner()
+    try {
+      const result = await queryRunner.query(sql)
+      return result
+    } finally {
+      await queryRunner.release()
+    }
+  }
+}
 
 /**
  * 创建 SQLDatabase 实例
  * @param {Object} config - 数据库配置
- * @returns {Promise<SQLDatabase>} SQLDatabase 实例
+ * @returns {Promise<Object>} SQLDatabase 实例和连接对象
  */
 export async function createSQLDatabase(config) {
   const { type, host, port, database, username, password, filePath } = config
@@ -20,7 +83,6 @@ export async function createSQLDatabase(config) {
   try {
     switch (type) {
       case 'SQLite': {
-        // SQLite 使用文件路径
         const dbPath = filePath || database
         dataSource = new DataSource({
           type: 'sqlite',
@@ -60,19 +122,15 @@ export async function createSQLDatabase(config) {
     // 初始化数据源
     await dataSource.initialize()
 
-    // 创建 SQLDatabase 实例
-    const db = await SQLDatabase.fromDataSource(dataSource, {
-      sampleRowsInTableInfo: 3, // 显示3条样本数据
-      includesTables: [], // 空数组表示包含所有表
-      ignoreTables: [], // 忽略的表列表
-    })
+    // 创建简化的 SQLDatabase 实例
+    const db = new SimpleSQLDatabase(dataSource)
 
     console.log(`[SQLDatabase] 成功连接到 ${type} 数据库`)
     console.log(`[SQLDatabase] 可用表:`, await db.getUsableTableNames())
 
     return {
       db,
-      dataSource, // 返回数据源以便后续关闭
+      dataSource,
     }
   } catch (error) {
     console.error('[SQLDatabase] 连接失败:', error.message)
@@ -85,7 +143,6 @@ export async function createSQLDatabase(config) {
 
 /**
  * 关闭数据库连接
- * @param {Object} connection - createSQLDatabase 返回的对象
  */
 export async function closeDatabase(connection) {
   if (connection && connection.dataSource) {
@@ -96,8 +153,6 @@ export async function closeDatabase(connection) {
 
 /**
  * 获取数据库元数据（兼容旧接口）
- * @param {Object} config - 数据库配置
- * @returns {Promise<Object>} 元数据
  */
 export async function getDatabaseMetadata(config) {
   const { db, dataSource } = await createSQLDatabase(config)
@@ -110,7 +165,7 @@ export async function getDatabaseMetadata(config) {
       const tableInfo = await db.getTableInfo([tableName])
       tables.push({
         name: tableName,
-        schema: tableInfo,
+        schema: tableInfo[tableName],
       })
     }
 
@@ -125,15 +180,11 @@ export async function getDatabaseMetadata(config) {
 
 /**
  * 执行 SQL 查询
- * @param {Object} config - 数据库配置
- * @param {string} sql - SQL 查询语句
- * @returns {Promise<Array>} 查询结果
  */
 export async function executeQuery(config, sql) {
   const { db, dataSource } = await createSQLDatabase(config)
 
   try {
-    // 使用 SQLDatabase 执行查询
     const result = await db.run(sql)
     return result
   } catch (error) {
@@ -146,8 +197,6 @@ export async function executeQuery(config, sql) {
 
 /**
  * 测试数据库连接
- * @param {Object} config - 数据库配置
- * @returns {Promise<Object>} 测试结果
  */
 export async function testConnection(config) {
   let connection
