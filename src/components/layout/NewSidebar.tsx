@@ -58,10 +58,10 @@ export default function NewSidebar({
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1">
-            <div className="w-8 h-8 bg-red-600 rounded flex items-center justify-center">
-              <span className="text-white font-bold text-lg">S</span>
+            <div className="w-8 h-8 bg-gray-900 rounded flex items-center justify-center">
+              <span className="text-white font-bold text-lg">H</span>
             </div>
-            <span className="text-2xl font-bold text-gray-900">白泽</span>
+            <span className="text-2xl font-bold text-gray-900">黑泽</span>
           </div>
         </div>
       </div>
