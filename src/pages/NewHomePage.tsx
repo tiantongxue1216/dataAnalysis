@@ -187,21 +187,24 @@ export default function NewHomePage({
           topK: 5,
           maxIterations: 10,
           onStep: (step: ExecutionStep) => {
-            console.log('[Stream] 收到步骤:', step)
+            console.log('[Stream] 收到步骤:', step.id, step.status)
             
-            // 更新步骤列表（使用函数式更新确保获取最新状态）
+            // 更新步骤列表（使用 Map 来确保正确更新）
             setCurrentSteps(prev => {
-              const updated = [...prev]
-              const existingIndex = updated.findIndex(s => s.id === step.id)
-              if (existingIndex >= 0) {
-                // 更新现有步骤
-                updated[existingIndex] = step
-              } else {
-                // 添加新步骤
-                updated.push(step)
-              }
+              const stepMap = new Map()
+              prev.forEach(s => stepMap.set(s.id, s))
+              
+              // 更新或添加步骤
+              stepMap.set(step.id, step)
+              
+              const updated = Array.from(stepMap.values())
+              
               // 同步更新 ref
               stepsRef.current = updated
+              
+              console.log('[Stream] 当前步骤数:', updated.length, 'ReAct 状态:', 
+                updated.find(s => s.id === 'react-mode')?.status)
+              
               return updated
             })
           },
