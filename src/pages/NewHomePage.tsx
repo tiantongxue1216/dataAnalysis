@@ -296,14 +296,6 @@ export default function NewHomePage({
   // 对话界面
   return (
     <div className="h-full flex flex-col bg-white">
-      {/* 顶部标题 */}
-      <div className="px-6 py-4 border-b border-gray-100 bg-white">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-blue-600" />
-          <h2 className="text-lg font-semibold text-gray-900">简单查询</h2>
-        </div>
-      </div>
-
       {/* 消息列表 */}
       <div className="flex-1 overflow-y-auto px-6 py-6">
         <div className="max-w-4xl mx-auto space-y-8">
