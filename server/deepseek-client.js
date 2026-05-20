@@ -12,7 +12,7 @@ function getDeepSeekConfig() {
   return {
     apiKey: process.env.DEEPSEEK_API_KEY || process.env.DASHSCOPE_API_KEY || config.deepseekApiKey,
     apiUrl: process.env.DEEPSEEK_API_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
-    model: process.env.DEEPSEEK_MODEL || 'deepseek-v3',
+    model: process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash',
     timeout: 30000, // 30秒超时
     enable_thinking: process.env.DEEPSEEK_ENABLE_THINKING !== 'false', // 默认开启思考模式
   }

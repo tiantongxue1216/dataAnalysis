@@ -15,7 +15,7 @@ import { createSQLDatabaseToolkit, getDefaultSystemPrompt } from './langchain-sq
 function initLLM() {
   const apiKey = process.env.DEEPSEEK_API_KEY || process.env.DASHSCOPE_API_KEY
   const baseUrl = process.env.DEEPSEEK_API_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1'
-  const model = process.env.DEEPSEEK_MODEL || 'deepseek-v3'
+  const model = process.env.DEEPSEEK_MODEL || 'deepseek-v4-flash'
 
   console.log('[NL2SQL Agent] 初始化 LLM')
   console.log('  API Key:', apiKey ? `${apiKey.substring(0, 8)}...` : '未设置')
