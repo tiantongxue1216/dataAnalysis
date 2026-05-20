@@ -30,25 +30,15 @@ export default function StreamingSteps({ steps }: StreamingStepsProps) {
   }
 
   return (
-    <div className="border border-gray-200 rounded-lg overflow-hidden">
-      <div className="px-4 py-2.5 bg-gray-100 border-b border-gray-200">
-        <div className="flex items-center gap-2 text-sm text-gray-700">
-          <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
-          <span className="font-medium">执行步骤</span>
-          <span className="text-gray-500">({steps.length} 步)</span>
-        </div>
-      </div>
-      
-      <div className="divide-y divide-gray-200">
-        {steps.map((step) => (
-          <StepItem 
-            key={step.id} 
-            step={step} 
-            isExpanded={expandedSteps.has(step.id)}
-            onToggle={() => toggleStep(step.id)}
-          />
-        ))}
-      </div>
+    <div className="divide-y divide-gray-200">
+      {steps.map((step) => (
+        <StepItem 
+          key={step.id} 
+          step={step} 
+          isExpanded={expandedSteps.has(step.id)}
+          onToggle={() => toggleStep(step.id)}
+        />
+      ))}
     </div>
   )
 }

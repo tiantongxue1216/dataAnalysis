@@ -90,6 +90,7 @@ export default function NewHomePage({
   // 流式步骤状态（新增）
   const [currentSteps, setCurrentSteps] = useState<ExecutionStep[]>([])
   const streamAbortControllerRef = useRef<AbortController | null>(null)
+  const stepsRef = useRef<ExecutionStep[]>([]) // 用 ref 保存最新的步骤
 
   // 获取当前活跃会话的消息
   const messages = activeSessionId ? (getSessionMessages ? getSessionMessages(activeSessionId) : (messagesBySession[activeSessionId] || [])) : []
@@ -188,18 +189,20 @@ export default function NewHomePage({
           onStep: (step: ExecutionStep) => {
             console.log('[Stream] 收到步骤:', step)
             
-            // 更新步骤列表
+            // 更新步骤列表（使用函数式更新确保获取最新状态）
             setCurrentSteps(prev => {
-              const existingIndex = prev.findIndex(s => s.id === step.id)
+              const updated = [...prev]
+              const existingIndex = updated.findIndex(s => s.id === step.id)
               if (existingIndex >= 0) {
                 // 更新现有步骤
-                const updated = [...prev]
                 updated[existingIndex] = step
-                return updated
               } else {
                 // 添加新步骤
-                return [...prev, step]
+                updated.push(step)
               }
+              // 同步更新 ref
+              stepsRef.current = updated
+              return updated
             })
           },
           onComplete: (result: any) => {
@@ -207,26 +210,17 @@ export default function NewHomePage({
             
             const duration = ((Date.now() - startTime) / 1000).toFixed(3)
             
-            // 构建思考过程（保留旧的格式以兼容）
-            const thinkingLines = [
-              `🚀 NL2SQL Agent 执行完成`,
-              `━━━━━━━━━━━━━━━━━━━━━━━`,
-              `耗时: ${duration}秒`,
-              `数据库类型: ${result.metadata?.dialect || '未知'}`,
-            ]
-            
             const aiMessage: ChatMessage = {
               id: tempMessageId,
               role: 'assistant',
               content: result.answer || '抱歉，未能生成回答',
               timestamp: new Date(),
-              thinking: thinkingLines.join('\n'),
               duration: parseFloat(duration),
               agentMode: true,
               sql: result.sql || undefined,
               data: result.data?.rows || undefined,
               recommendation: result.recommendation || undefined,
-              steps: currentSteps, // 保存步骤数据
+              steps: stepsRef.current, // 使用 ref 中的最新步骤数据
             }
             
             addMessageToCurrentSession(aiMessage)
@@ -472,13 +466,8 @@ export default function NewHomePage({
                     <span>耗时 {message.duration}秒</span>
                   </div>
 
-                  {/* 流式步骤展示（新增） */}
+                  {/* 流式步骤展示（新增） - 默认折叠 */}
                   {message.steps && message.steps.length > 0 && (
-                    <StreamingSteps steps={message.steps} />
-                  )}
-
-                  {/* 思考和处理过程（保留旧格式） */}
-                  {message.thinking && (!message.steps || message.steps.length === 0) && (
                     <div className="border border-gray-200 rounded-lg overflow-hidden">
                       <button
                         onClick={() => toggleThinking(message.id)}
@@ -487,6 +476,7 @@ export default function NewHomePage({
                         <div className="flex items-center gap-2 text-sm text-gray-700">
                           <Sparkles className="w-4 h-4 text-blue-600" />
                           <span>思考和处理过程</span>
+                          <span className="text-xs text-gray-500">({message.steps.length} 步)</span>
                         </div>
                         {expandedThinking[message.id] ? (
                           <ChevronDown className="w-4 h-4 text-gray-400" />
@@ -495,8 +485,8 @@ export default function NewHomePage({
                         )}
                       </button>
                       {expandedThinking[message.id] && (
-                        <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
-                          <p className="text-sm text-gray-600 whitespace-pre-wrap">{message.thinking}</p>
+                        <div className="border-t border-gray-200">
+                          <StreamingSteps steps={message.steps} />
                         </div>
                       )}
                     </div>
