@@ -606,18 +606,18 @@ export default function NewHomePage({
           {/* 加载指示器 */}
           {isLoading && (
             <div className="space-y-4">
-              {/* 流式步骤展示 */}
-              {currentSteps.length > 0 && (
-                <StreamingSteps steps={currentSteps} />
-              )}
-              
-              {/* 加载动画 */}
+              {/* 加载动画 - 放在最上面 */}
               <div className="flex items-center gap-2 text-sm text-gray-500">
                 <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
                 <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                 <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
                 <span className="ml-2">AI正在思考中...</span>
               </div>
+              
+              {/* 流式步骤展示 */}
+              {currentSteps.length > 0 && (
+                <StreamingSteps steps={currentSteps} />
+              )}
             </div>
           )}
         </div>

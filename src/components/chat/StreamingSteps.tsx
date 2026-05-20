@@ -25,6 +25,20 @@ export default function StreamingSteps({ steps }: StreamingStepsProps) {
     })
   }
 
+  // 递归切换子步骤
+  const toggleChildStep = (parentId: string, childId: string) => {
+    setExpandedSteps(prev => {
+      const next = new Set(prev)
+      const key = `${parentId}-${childId}`
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+      }
+      return next
+    })
+  }
+
   if (steps.length === 0) {
     return null
   }
@@ -37,6 +51,8 @@ export default function StreamingSteps({ steps }: StreamingStepsProps) {
           step={step} 
           isExpanded={expandedSteps.has(step.id)}
           onToggle={() => toggleStep(step.id)}
+          isChildExpanded={(childId: string) => expandedSteps.has(`${step.id}-${childId}`)}
+          onChildToggle={(childId: string) => toggleChildStep(step.id, childId)}
         />
       ))}
     </div>
@@ -48,12 +64,14 @@ interface StepItemProps {
   isExpanded: boolean
   onToggle: () => void
   depth?: number
+  isChildExpanded?: (childId: string) => boolean
+  onChildToggle?: (childId: string) => void
 }
 
 /**
  * 单个步骤项
  */
-function StepItem({ step, isExpanded, onToggle, depth = 0 }: StepItemProps) {
+function StepItem({ step, isExpanded, onToggle, depth = 0, isChildExpanded, onChildToggle }: StepItemProps) {
   const statusIcon = {
     running: <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />,
     completed: <CheckCircle2 className="w-4 h-4 text-green-600" />,
@@ -122,9 +140,11 @@ function StepItem({ step, isExpanded, onToggle, depth = 0 }: StepItemProps) {
             <StepItem 
               key={child.id} 
               step={child} 
-              isExpanded={false}
-              onToggle={() => {}}
+              isExpanded={isChildExpanded ? isChildExpanded(child.id) : false}
+              onToggle={() => onChildToggle ? onChildToggle(child.id) : {}}
               depth={depth + 1}
+              isChildExpanded={isChildExpanded}
+              onChildToggle={onChildToggle}
             />
           ))}
         </div>
