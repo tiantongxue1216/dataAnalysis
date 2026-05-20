@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import { useMemo } from 'react'
 import ReactECharts from 'echarts-for-react'
 import { TrendingUp, BarChart3, PieChart, Table2, CircleDot } from 'lucide-react'
 
@@ -171,22 +171,35 @@ function ChartTypeSelector({
   currentType: string
   onTypeChange: (type: string) => void
 }) {
+  // 显示所有图表类型
+  const visibleTypes = CHART_TYPES.filter(t => 
+    t.value === 'line' || 
+    t.value === 'bar' || 
+    t.value === 'pie' || 
+    t.value === 'scatter' || 
+    t.value === 'table'
+  )
+
   return (
-    <div className="flex items-center gap-1">
-      {CHART_TYPES.filter((t: any) => t.value !== 'grouped_bar' && t.value !== 'stacked_bar' && t.value !== 'horizontal_bar').map((type: any) => (
-        <button
-          key={type.value}
-          onClick={() => onTypeChange(type.value)}
-          className={`p-2 rounded-lg transition-all ${
-            currentType === type.value
-              ? 'bg-primary text-white shadow-sm'
-              : 'text-gray-600 hover:bg-gray-100'
-          }`}
-          title={type.label}
-        >
-          {getChartIcon(type.value, 16)}
-        </button>
-      ))}
+    <div className="flex items-center gap-1 bg-gray-50 p-1 rounded-lg">
+      {visibleTypes.map((type: any) => {
+        const isActive = currentType === type.value
+        return (
+          <button
+            key={type.value}
+            onClick={() => onTypeChange(type.value)}
+            className={`px-2.5 py-1.5 rounded-md transition-all text-xs font-medium flex items-center gap-1 ${
+              isActive
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-gray-600 hover:bg-gray-200 hover:text-gray-900'
+            }`}
+            title={type.label}
+          >
+            {getChartIcon(type.value, 14)}
+            <span className="hidden sm:inline">{type.label}</span>
+          </button>
+        )
+      })}
     </div>
   )
 }
