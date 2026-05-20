@@ -45,6 +45,7 @@ export default function NewAppLayout({
               selectedDatasourceId,
               activeSessionId,
               onUpdateSession,
+              onNewChat,
             })
           }
           return child

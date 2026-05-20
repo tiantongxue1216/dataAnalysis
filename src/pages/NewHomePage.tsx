@@ -63,11 +63,13 @@ export default function NewHomePage({
   onDatasourceChange,
   activeSessionId,
   onUpdateSession,
+  onNewChat,
 }: { 
   selectedDatasourceId: string | null
   onDatasourceChange?: (id: string) => void
   activeSessionId?: string
   onUpdateSession?: (sessionId: string, title: string, messageCount: number) => void
+  onNewChat?: () => void
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputValue, setInputValue] = useState('')
@@ -226,6 +228,18 @@ export default function NewHomePage({
     }))
   }
 
+  const handleNewChatClick = () => {
+    // 清空当前对话
+    setMessages([])
+    setCurrentChartTypes({})
+    setExpandedThinking({})
+    
+    // 调用父组件的新建会话函数
+    if (onNewChat) {
+      onNewChat()
+    }
+  }
+
   const toggleThinking = (messageId: string) => {
     setExpandedThinking(prev => ({
       ...prev,
@@ -293,7 +307,10 @@ export default function NewHomePage({
             
             {/* 底部工具栏 */}
             <div className="flex items-center justify-end gap-3 mt-3">
-              <button className="px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-1.5">
+              <button 
+                onClick={handleNewChatClick}
+                className="px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-1.5"
+              >
                 <MessageSquare className="w-4 h-4" />
                 <span>新建对话</span>
               </button>
@@ -514,7 +531,10 @@ export default function NewHomePage({
           
           {/* 底部工具栏 */}
           <div className="flex items-center justify-end gap-3 mt-3">
-            <button className="px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-1.5">
+            <button 
+              onClick={handleNewChatClick}
+              className="px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-1.5"
+            >
               <MessageSquare className="w-4 h-4" />
               <span>新建对话</span>
             </button>
