@@ -162,10 +162,20 @@ export async function getDatabaseMetadata(config) {
     const tables = []
 
     for (const tableName of tableNames) {
+      // 跳过 SQLite 系统表
+      if (tableName === 'sqlite_sequence') continue
+      
       const tableInfo = await db.getTableInfo([tableName])
+      const tableSchema = tableInfo[tableName]
+      
       tables.push({
         name: tableName,
-        schema: tableInfo[tableName],
+        columns: tableSchema.columns.map(col => ({
+          name: col.name,
+          type: col.type,
+          nullable: col.nullable,
+          primaryKey: col.primaryKey,
+        })),
       })
     }
 
