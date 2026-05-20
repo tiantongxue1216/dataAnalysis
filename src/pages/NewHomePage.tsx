@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { 
   MessageSquare, 
   ArrowRight, 
@@ -16,9 +16,10 @@ import {
   ChevronDown,
   Code2
 } from 'lucide-react'
-import { dataSourceApi, nl2sqlApi } from '@/services/api'
+import { dataSourceApi, nl2sqlApi, type ExecutionStep } from '@/services/api'
 import type { DataSource } from '@/types/datasource'
 import DataVisualization from '@/components/chart/DataVisualization'
+import StreamingSteps from '@/components/chat/StreamingSteps'
 
 interface ChartRecommendation {
   chartType: string
@@ -48,6 +49,8 @@ interface ChatMessage {
   recommendation?: ChartRecommendation
   // NL2SQL 生成的 SQL 语句
   sql?: string
+  // 流式步骤（新增）
+  steps?: ExecutionStep[]
 }
 
 const sampleQuestions = [
@@ -84,6 +87,9 @@ export default function NewHomePage({
   const [expandedThinking, setExpandedThinking] = useState<{[key: string]: boolean}>({})
   const [datasources, setDatasources] = useState<DataSource[]>([])
   const [currentChartTypes, setCurrentChartTypes] = useState<{[key: string]: string}>({})
+  // 流式步骤状态（新增）
+  const [currentSteps, setCurrentSteps] = useState<ExecutionStep[]>([])
+  const streamAbortControllerRef = useRef<AbortController | null>(null)
 
   // 获取当前活跃会话的消息
   const messages = activeSessionId ? (getSessionMessages ? getSessionMessages(activeSessionId) : (messagesBySession[activeSessionId] || [])) : []
@@ -143,12 +149,13 @@ export default function NewHomePage({
     addMessageToCurrentSession(userMessage)
     setInputValue('')
     setIsLoading(true)
+    setCurrentSteps([]) // 清空步骤
   
     try {
       const startTime = Date.now()
         
-      // 使用 NL2SQL Agent API
-      await handleNL2SQLQuery(content, startTime)
+      // 使用流式 NL2SQL Agent API
+      await handleNL2SQLQueryStream(content, startTime)
     } catch (error: any) {
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -159,11 +166,94 @@ export default function NewHomePage({
       addMessageToCurrentSession(errorMessage)
     } finally {
       setIsLoading(false)
+      setCurrentSteps([]) // 清空步骤
     }
   }
 
   /**
-   * NL2SQL Agent 模式查询
+   * 流式 NL2SQL Agent 模式查询（新增）
+   */
+  const handleNL2SQLQueryStream = async (content: string, startTime: number) => {
+    return new Promise<void>((resolve, reject) => {
+      // 创建临时消息用于显示流式步骤
+      const tempMessageId = (Date.now() + 1).toString()
+      
+      // 调用流式 API
+      const abortController = nl2sqlApi.queryStream(
+        content,
+        selectedDatasourceId!,
+        {
+          topK: 5,
+          maxIterations: 10,
+          onStep: (step: ExecutionStep) => {
+            console.log('[Stream] 收到步骤:', step)
+            
+            // 更新步骤列表
+            setCurrentSteps(prev => {
+              const existingIndex = prev.findIndex(s => s.id === step.id)
+              if (existingIndex >= 0) {
+                // 更新现有步骤
+                const updated = [...prev]
+                updated[existingIndex] = step
+                return updated
+              } else {
+                // 添加新步骤
+                return [...prev, step]
+              }
+            })
+          },
+          onComplete: (result: any) => {
+            console.log('[Stream] 查询完成:', result)
+            
+            const duration = ((Date.now() - startTime) / 1000).toFixed(3)
+            
+            // 构建思考过程（保留旧的格式以兼容）
+            const thinkingLines = [
+              `🚀 NL2SQL Agent 执行完成`,
+              `━━━━━━━━━━━━━━━━━━━━━━━`,
+              `耗时: ${duration}秒`,
+              `数据库类型: ${result.metadata?.dialect || '未知'}`,
+            ]
+            
+            const aiMessage: ChatMessage = {
+              id: tempMessageId,
+              role: 'assistant',
+              content: result.answer || '抱歉，未能生成回答',
+              timestamp: new Date(),
+              thinking: thinkingLines.join('\n'),
+              duration: parseFloat(duration),
+              agentMode: true,
+              sql: result.sql || undefined,
+              data: result.data?.rows || undefined,
+              recommendation: result.recommendation || undefined,
+              steps: currentSteps, // 保存步骤数据
+            }
+            
+            addMessageToCurrentSession(aiMessage)
+            
+            // 更新会话标题和消息数量
+            if (activeSessionId && onUpdateSession) {
+              const userMessageCount = messages.filter(m => m.role === 'user').length + 1
+              const sessionTitle = content.length > 30 ? content.substring(0, 30) + '...' : content
+              onUpdateSession(activeSessionId, sessionTitle, userMessageCount)
+            }
+            
+            resolve()
+          },
+          onError: (error: Error) => {
+            console.error('[Stream] 查询失败:', error)
+            reject(error)
+          },
+        }
+      )
+      
+      // 保存 abortController 以便取消
+      streamAbortControllerRef.current = abortController
+    })
+  }
+
+  /**
+   * NL2SQL Agent 模式查询（保留旧版本作为备用）
    */
   const handleNL2SQLQuery = async (content: string, startTime: number) => {
     try {
@@ -382,8 +472,13 @@ export default function NewHomePage({
                     <span>耗时 {message.duration}秒</span>
                   </div>
 
-                  {/* 思考和处理过程 */}
-                  {message.thinking && (
+                  {/* 流式步骤展示（新增） */}
+                  {message.steps && message.steps.length > 0 && (
+                    <StreamingSteps steps={message.steps} />
+                  )}
+
+                  {/* 思考和处理过程（保留旧格式） */}
+                  {message.thinking && (!message.steps || message.steps.length === 0) && (
                     <div className="border border-gray-200 rounded-lg overflow-hidden">
                       <button
                         onClick={() => toggleThinking(message.id)}
@@ -520,11 +615,19 @@ export default function NewHomePage({
 
           {/* 加载指示器 */}
           {isLoading && (
-            <div className="flex items-center gap-2 text-sm text-gray-500">
-              <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
-              <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-              <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
-              <span className="ml-2">AI正在思考中...</span>
+            <div className="space-y-4">
+              {/* 流式步骤展示 */}
+              {currentSteps.length > 0 && (
+                <StreamingSteps steps={currentSteps} />
+              )}
+              
+              {/* 加载动画 */}
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                <span className="ml-2">AI正在思考中...</span>
+              </div>
             </div>
           )}
         </div>

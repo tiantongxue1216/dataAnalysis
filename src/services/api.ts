@@ -9,6 +9,19 @@ import type { IntentObject, IntentRecognitionResult } from '@/types/intent'
 const API_BASE_URL = 'http://localhost:3001/api'
 
 /**
+ * 执行步骤类型（用于流式输出）
+ */
+export interface ExecutionStep {
+  id: string
+  title: string
+  status: 'running' | 'completed' | 'error'
+  duration: string
+  details: string
+  collapsible?: boolean
+  children?: ExecutionStep[]
+}
+
+/**
  * 通用请求方法
  */
 async function request<T = any>(url: string, options: RequestInit = {}): Promise<T> {
@@ -338,5 +351,106 @@ export const nl2sqlApi = {
         max_iterations: options?.maxIterations || 10,
       }),
     })
+  },
+
+  /**
+   * 流式执行自然语言到 SQL 的查询
+   * @param question - 用户问题
+   * @param datasourceId - 数据源 ID
+   * @param options - 可选参数
+   * @returns 返回 abortController 用于取消请求
+   */
+  queryStream(
+    question: string,
+    datasourceId: string,
+    options?: {
+      topK?: number
+      maxIterations?: number
+      onStep?: (step: ExecutionStep) => void
+      onComplete?: (result: any) => void
+      onError?: (error: Error) => void
+    }
+  ): AbortController {
+    const abortController = new AbortController()
+
+    const fetchStream = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/nl2sql/query/stream`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            question,
+            datasource_id: datasourceId,
+            top_k: options?.topK || 5,
+            max_iterations: options?.maxIterations || 10,
+          }),
+          signal: abortController.signal,
+        })
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+
+        const reader = response.body?.getReader()
+        if (!reader) {
+          throw new Error('无法读取响应流')
+        }
+
+        const decoder = new TextDecoder()
+        let buffer = ''
+
+        while (true) {
+          const { done, value } = await reader.read()
+          
+          if (done) {
+            break
+          }
+
+          buffer += decoder.decode(value, { stream: true })
+          
+          // 处理 SSE 事件
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || '' // 保留最后一行（可能不完整）
+
+          for (const line of lines) {
+            if (line.startsWith('event: ')) {
+              const eventType = line.slice(7)
+              
+              // 读取下一行获取数据
+              const dataLineIndex = lines.indexOf(line) + 1
+              if (dataLineIndex < lines.length && lines[dataLineIndex].startsWith('data: ')) {
+                const dataStr = lines[dataLineIndex].slice(6)
+                
+                try {
+                  const data = JSON.parse(dataStr)
+                  
+                  if (eventType === 'step' && options?.onStep) {
+                    options.onStep(data)
+                  } else if (eventType === 'complete' && options?.onComplete) {
+                    options.onComplete(data)
+                  } else if (eventType === 'error' && options?.onError) {
+                    options.onError(new Error(data.error))
+                  }
+                } catch (e) {
+                  console.error('解析 SSE 数据失败:', e)
+                }
+              }
+            }
+          }
+        }
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
+          console.error('流式请求失败:', error)
+          if (options?.onError) {
+            options.onError(error)
+          }
+        }
+      }
+    }
+
+    fetchStream()
+    return abortController
   },
 }

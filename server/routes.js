@@ -626,6 +626,75 @@ app.post('/api/nl2sql/query', async (req, res) => {
 })
 
 /**
+ * NL2SQL Agent 流式查询接口
+ * POST /api/nl2sql/query/stream
+ * 使用 Server-Sent Events (SSE) 实时推送执行步骤
+ */
+app.post('/api/nl2sql/query/stream', async (req, res) => {
+  try {
+    const { question, datasource_id, max_iterations, top_k } = req.body
+
+    if (!question) {
+      return res.status(400).json({
+        success: false,
+        error: '问题不能为空'
+      })
+    }
+
+    if (!datasource_id) {
+      return res.status(400).json({
+        success: false,
+        error: '数据源 ID 不能为空'
+      })
+    }
+
+    console.log('[NL2SQL Stream API] 收到流式查询请求:', question)
+
+    // 获取数据源配置
+    const datasource = storage.getById(datasource_id)
+    if (!datasource) {
+      return res.status(404).json({
+        success: false,
+        error: '数据源不存在'
+      })
+    }
+
+    // 设置 SSE 响应头
+    res.setHeader('Content-Type', 'text/event-stream')
+    res.setHeader('Cache-Control', 'no-cache')
+    res.setHeader('Connection', 'keep-alive')
+
+    // 发送事件辅助函数
+    const sendEvent = (event, data) => {
+      res.write(`event: ${event}\n`)
+      res.write(`data: ${JSON.stringify(data)}\n\n`)
+    }
+
+    // 创建 NL2SQL Agent 实例
+    const nl2sqlAgent = createNL2SQLAgent()
+
+    // 执行流式查询
+    const result = await nl2sqlAgent.executeStream(question, datasource, {
+      topK: top_k || 5,
+      maxIterations: max_iterations || 10,
+      onStep: (step) => {
+        // 实时推送每个执行步骤
+        sendEvent('step', step)
+      }
+    })
+
+    // 发送最终结果
+    sendEvent('complete', result)
+    res.end()
+  } catch (error) {
+    console.error('[NL2SQL Stream API] 查询失败:', error)
+    res.write(`event: error\n`)
+    res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`)
+    res.end()
+  }
+})
+
+/**
  * 获取可用工具列表
  * GET /api/agent/tools
  */
