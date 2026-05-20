@@ -145,6 +145,21 @@ function App() {
     }
   }, [messagesBySession, isInitialized])
 
+  // 页面首次加载时自动创建第一个会话（仅当没有本地数据时）
+  useEffect(() => {
+    if (isInitialized && sessions.length === 0 && !activeSessionId) {
+      console.log('[App] 创建默认会话')
+      const firstSession: Session = {
+        id: Date.now().toString(),
+        title: '新会话 1',
+        timestamp: new Date(),
+        messageCount: 0,
+      }
+      setSessions([firstSession])
+      setActiveSessionId(firstSession.id)
+    }
+  }, [isInitialized, sessions.length, activeSessionId])
+
   const handleNewChat = () => {
     console.log('[App] 创建新会话')
     const newSession: Session = {
