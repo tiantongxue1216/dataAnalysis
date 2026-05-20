@@ -61,9 +61,13 @@ const sampleQuestions = [
 export default function NewHomePage({ 
   selectedDatasourceId,
   onDatasourceChange,
+  activeSessionId,
+  onUpdateSession,
 }: { 
   selectedDatasourceId: string | null
   onDatasourceChange?: (id: string) => void
+  activeSessionId?: string
+  onUpdateSession?: (sessionId: string, title: string, messageCount: number) => void
 }) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [inputValue, setInputValue] = useState('')
@@ -185,6 +189,13 @@ export default function NewHomePage({
         recommendation: nl2sqlResult.recommendation || undefined,
       }
       setMessages(prev => [...prev, aiMessage])
+      
+      // 更新会话标题和消息数量
+      if (activeSessionId && onUpdateSession) {
+        const userMessageCount = messages.filter(m => m.role === 'user').length + 1
+        const sessionTitle = content.length > 30 ? content.substring(0, 30) + '...' : content
+        onUpdateSession(activeSessionId, sessionTitle, userMessageCount)
+      }
     } catch (error: any) {
       console.error('NL2SQL 查询失败:', error)
       

@@ -27,12 +27,23 @@ function App() {
     setActiveSessionId(newSession.id)
   }
 
+  const handleUpdateSession = (sessionId: string, title: string, messageCount: number) => {
+    setSessions(prev => 
+      prev.map(session => 
+        session.id === sessionId 
+          ? { ...session, title, messageCount }
+          : session
+      )
+    )
+  }
+
   return (
     <BrowserRouter>
       <NewAppLayout 
         onNewChat={handleNewChat} 
         sessions={sessions} 
         activeSessionId={activeSessionId}
+        onUpdateSession={handleUpdateSession}
         selectedDatasourceId={selectedDatasourceId}
         onDatasourceChange={setSelectedDatasourceId}
       >

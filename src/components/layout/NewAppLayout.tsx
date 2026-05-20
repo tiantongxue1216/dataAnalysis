@@ -14,6 +14,7 @@ interface NewAppLayoutProps {
   onNewChat?: () => void
   sessions?: Session[]
   activeSessionId?: string
+  onUpdateSession?: (sessionId: string, title: string, messageCount: number) => void
   selectedDatasourceId?: string | null
   onDatasourceChange?: (id: string) => void
 }
@@ -23,6 +24,7 @@ export default function NewAppLayout({
   onNewChat, 
   sessions = [], 
   activeSessionId,
+  onUpdateSession,
   selectedDatasourceId = null,
   onDatasourceChange,
 }: NewAppLayoutProps) {
@@ -40,7 +42,9 @@ export default function NewAppLayout({
         {Children.map(children, child => {
           if (isValidElement(child)) {
             return cloneElement(child as any, { 
-              selectedDatasourceId 
+              selectedDatasourceId,
+              activeSessionId,
+              onUpdateSession,
             })
           }
           return child
