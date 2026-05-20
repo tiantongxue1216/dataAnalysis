@@ -2,11 +2,11 @@ import { useState, useEffect } from 'react'
 import { 
   Database, 
   ChevronRight, 
-  ChevronDown, 
-  Table,
-  Hash,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  Table2,
+  Key,
+  Type
 } from 'lucide-react'
 import { dataSourceApi } from '@/services/api'
 import type { DataSource } from '@/types/datasource'
@@ -23,7 +23,7 @@ interface TableInfo {
 }
 
 interface DataTreePanelProps {
-  selectedDatasourceId: string | null
+  selectedDatasourceId?: string
 }
 
 export default function DataTreePanel({ selectedDatasourceId }: DataTreePanelProps) {
@@ -55,15 +55,15 @@ export default function DataTreePanel({ selectedDatasourceId }: DataTreePanelPro
       const result = await dataSourceApi.getAll()
       if (result.success) {
         setDatasources(result.data)
-        // 如果没有选中数据源，默认选择第一个
+        // 如果没有选中的数据源，且有数据源列表，自动选择第一个
         if (!selectedDatasourceId && result.data.length > 0) {
-          setSelectedDatasource(result.data[0])
-          fetchTables(result.data[0])
+          const first = result.data[0]
+          setSelectedDatasource(first)
+          fetchTables(first)
         }
       }
     } catch (error) {
-      console.error('获取数据源失败:', error)
-      setError('获取数据源失败')
+      console.error('获取数据源列表失败:', error)
     }
   }
 
@@ -73,7 +73,6 @@ export default function DataTreePanel({ selectedDatasourceId }: DataTreePanelPro
       setError('')
       const result = await dataSourceApi.getMetadata(datasource)
       if (result.success && result.data) {
-        // 从元数据中提取表信息
         const tableList = result.data.tables || []
         setTables(tableList)
       } else {
@@ -81,19 +80,10 @@ export default function DataTreePanel({ selectedDatasourceId }: DataTreePanelPro
         setTables([])
       }
     } catch (error: any) {
-      console.error('获取表信息失败:', error)
       setError(error.message || '获取表信息失败')
       setTables([])
     } finally {
       setLoading(false)
-    }
-  }
-
-  const handleDatasourceChange = (datasourceId: string) => {
-    const ds = datasources.find(d => d.id === datasourceId)
-    if (ds) {
-      setSelectedDatasource(ds)
-      fetchTables(ds)
     }
   }
 
@@ -103,6 +93,8 @@ export default function DataTreePanel({ selectedDatasourceId }: DataTreePanelPro
       [tableName]: !prev[tableName]
     }))
   }
+
+
 
   return (
     <aside className="w-80 bg-white border-l border-gray-200 flex flex-col">
@@ -116,106 +108,84 @@ export default function DataTreePanel({ selectedDatasourceId }: DataTreePanelPro
 
       {/* 数据库选择器 */}
       <div className="p-3 border-b border-gray-200">
-        <label className="block text-xs font-medium text-gray-600 mb-1.5">
-          选择数据库
-        </label>
         <select
           value={selectedDatasource?.id || ''}
-          onChange={(e) => handleDatasourceChange(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+          onChange={(e) => {
+            const ds = datasources.find(d => d.id === e.target.value)
+            if (ds) {
+              setSelectedDatasource(ds)
+              fetchTables(ds)
+            }
+          }}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
         >
-          <option value="" disabled>
-            请选择数据库
-          </option>
+          <option value="" disabled>选择数据库</option>
           {datasources.map(ds => (
             <option key={ds.id} value={ds.id}>
-              {ds.name} ({ds.type})
+              {ds.name}
             </option>
           ))}
         </select>
       </div>
 
-      {/* 数据模型选择器（当前选中的数据库） */}
+      {/* 当前数据库信息 */}
       {selectedDatasource && (
         <div className="p-3 border-b border-gray-200 bg-blue-50">
-          <label className="block text-xs font-medium text-blue-800 mb-1.5">
-            当前数据库
-          </label>
-          <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-blue-200">
+          <div className="flex items-center gap-2">
             <Database className="w-4 h-4 text-blue-600" />
-            <span className="text-sm text-blue-900 font-medium truncate">
-              {selectedDatasource.name}
-            </span>
+            <span className="text-sm font-medium text-blue-900">{selectedDatasource.name}</span>
           </div>
+          <div className="text-xs text-blue-600 mt-1">{selectedDatasource.type}</div>
         </div>
       )}
 
       {/* 表和字段列表 */}
       <div className="flex-1 overflow-y-auto py-2">
         {loading ? (
-          <div className="flex flex-col items-center justify-center py-12 gap-3">
-            <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
-            <span className="text-sm text-gray-500">加载表结构...</span>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center py-12 gap-3 px-4">
-            <AlertCircle className="w-6 h-6 text-red-500" />
-            <span className="text-sm text-red-600 text-center">{error}</span>
+          <div className="flex items-center gap-2 px-4 py-3 text-sm text-red-600">
+            <AlertCircle className="w-4 h-4" />
+            <span>{error}</span>
           </div>
-        ) : tables.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 gap-3 px-4">
-            <Database className="w-8 h-8 text-gray-300" />
-            <span className="text-sm text-gray-400 text-center">
-              {selectedDatasource ? '该数据库没有表' : '请先选择数据库'}
-            </span>
-          </div>
-        ) : (
+        ) : tables.length > 0 ? (
           <div className="space-y-1">
-            {tables.map((table) => {
-              const tableName = table.name || table.table_name || '未知表'
+            {tables.map((table, idx) => {
+              const tableName = table.name || table.table_name || `Table ${idx + 1}`
               const isCollapsed = collapsedTables[tableName]
-              const columns = table.columns || []
               
               return (
-                <div key={tableName} className="border-b border-gray-100 last:border-b-0">
+                <div key={tableName}>
                   {/* 表名 */}
                   <button
                     onClick={() => toggleTable(tableName)}
-                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left hover:bg-gray-50 transition-colors"
+                    className="w-full flex items-center gap-2 py-2 px-3 hover:bg-gray-50 transition-colors"
                   >
-                    <ChevronRight 
-                      className={`w-4 h-4 text-gray-400 transition-transform ${
-                        isCollapsed ? '' : 'rotate-90'
-                      }`} 
-                    />
-                    <Table className="w-4 h-4 text-blue-600" />
-                    <span className="text-gray-900 font-medium truncate">
-                      {tableName}
-                    </span>
-                    <span className="ml-auto text-xs text-gray-400">
-                      {columns.length} 字段
-                    </span>
+                    <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} />
+                    <Table2 className="w-4 h-4 text-blue-600" />
+                    <span className="text-sm font-medium text-gray-900 truncate">{tableName}</span>
+                    <span className="text-xs text-gray-500 ml-auto">{table.columns.length} 字段</span>
                   </button>
 
                   {/* 字段列表 */}
-                  {!isCollapsed && columns.length > 0 && (
-                    <div className="bg-gray-50 py-1">
-                      {columns.map((col) => (
+                  {!isCollapsed && (
+                    <div className="ml-6 space-y-1 py-1">
+                      {table.columns.map((column) => (
                         <div
-                          key={col.name}
-                          className="flex items-center gap-2 px-3 py-1.5 pl-10 text-xs"
+                          key={column.name}
+                          className="flex items-center gap-2 py-1.5 px-2 text-xs hover:bg-gray-50"
                         >
-                          <Hash className="w-3 h-3 text-gray-400 flex-shrink-0" />
-                          <span className="text-gray-700 truncate flex-1">
-                            {col.name}
-                          </span>
-                          <span className="text-gray-400 font-mono text-[10px]">
-                            {col.type}
-                          </span>
-                          {col.primaryKey && (
-                            <span className="px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded text-[10px] font-medium">
-                              PK
-                            </span>
+                          {column.primaryKey ? (
+                            <Key className="w-3 h-3 text-yellow-600" />
+                          ) : (
+                            <Type className="w-3 h-3 text-gray-400" />
+                          )}
+                          <span className="text-gray-700 truncate flex-1">{column.name}</span>
+                          <span className="text-gray-500">{column.type}</span>
+                          {column.primaryKey && (
+                            <span className="px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded text-[10px]">PK</span>
                           )}
                         </div>
                       ))}
@@ -224,6 +194,13 @@ export default function DataTreePanel({ selectedDatasourceId }: DataTreePanelPro
                 </div>
               )
             })}
+          </div>
+        ) : (
+          <div className="text-center py-8 px-4">
+            <Database className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+            <p className="text-sm text-gray-500">
+              {selectedDatasource ? '该数据库没有表' : '请选择一个数据库'}
+            </p>
           </div>
         )}
       </div>

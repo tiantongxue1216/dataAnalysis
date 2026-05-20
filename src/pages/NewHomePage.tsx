@@ -71,7 +71,6 @@ export default function NewHomePage({
   const [expandedThinking, setExpandedThinking] = useState<{[key: string]: boolean}>({})
   const [datasources, setDatasources] = useState<DataSource[]>([])
   const [currentChartTypes, setCurrentChartTypes] = useState<{[key: string]: string}>({})
-  const [useNL2SQLMode, setUseNL2SQLMode] = useState(true) // 始终使用 NL2SQL 模式
 
   useEffect(() => {
     fetchDatasources()
@@ -97,8 +96,6 @@ export default function NewHomePage({
       console.error('获取数据源失败:', error)
     }
   }
-
-  const selectedDatasource = datasources.find(d => d.id === selectedDatasourceId)
 
   const handleSendMessage = async (content: string) => {
     if (!content.trim()) return
@@ -292,26 +289,7 @@ export default function NewHomePage({
             </div>
             
             {/* 底部工具栏 */}
-            <div className="flex items-center gap-3 mt-3">
-              {/* NL2SQL 模式切换（新） */}
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border border-purple-200">
-                <Sparkles className="w-4 h-4 text-purple-600" />
-                <span className="text-sm font-medium text-purple-700">NL2SQL (推荐)</span>
-                <button
-                  onClick={() => setUseNL2SQLMode(!useNL2SQLMode)}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                    useNL2SQLMode ? 'bg-purple-600' : 'bg-gray-300'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      useNL2SQLMode ? 'translate-x-4' : 'translate-x-0.5'
-                    }`}
-                  />
-                </button>
-              </div>
-
-              <div className="flex-1"></div>
+            <div className="flex items-center justify-end gap-3 mt-3">
               <button className="px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-1.5">
                 <MessageSquare className="w-4 h-4" />
                 <span>新建对话</span>
