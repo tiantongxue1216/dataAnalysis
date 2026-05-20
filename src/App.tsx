@@ -1,5 +1,5 @@
-import { useState, cloneElement, isValidElement } from 'react'
-import { BrowserRouter, Routes, Route, useOutlet } from 'react-router-dom'
+import { useState, cloneElement, isValidElement, Children } from 'react'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import NewAppLayout from './components/layout/NewAppLayout'
 import NewHomePage from './pages/NewHomePage'
 import DataSourcePage from './pages/DataSourcePage'
@@ -29,20 +29,20 @@ function AppContent({
   selectedDatasourceId: string | null
   onDatasourceChange: (id: string) => void
 }) {
-  const outlet = useOutlet()
-  
-  if (outlet && isValidElement(outlet)) {
-    return cloneElement(outlet as any, {
-      onNewChat,
-      sessions,
-      activeSessionId,
-      onUpdateSession,
-      selectedDatasourceId,
-      onDatasourceChange,
-    })
-  }
-  
-  return outlet
+  // 遍历 children 并注入额外的 props
+  return Children.map(children, child => {
+    if (isValidElement(child)) {
+      return cloneElement(child as any, {
+        onNewChat,
+        sessions,
+        activeSessionId,
+        onUpdateSession,
+        selectedDatasourceId,
+        onDatasourceChange,
+      })
+    }
+    return child
+  })
 }
 
 function App() {
