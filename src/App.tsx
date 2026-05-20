@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { useState, cloneElement, isValidElement } from 'react'
+import { BrowserRouter, Routes, Route, useOutlet } from 'react-router-dom'
 import NewAppLayout from './components/layout/NewAppLayout'
 import NewHomePage from './pages/NewHomePage'
 import DataSourcePage from './pages/DataSourcePage'
@@ -9,6 +9,40 @@ interface Session {
   title: string
   timestamp: Date
   messageCount: number
+}
+
+// 创建一个包装组件来传递 props
+function AppContent({ 
+  children,
+  onNewChat, 
+  sessions, 
+  activeSessionId, 
+  onUpdateSession,
+  selectedDatasourceId,
+  onDatasourceChange,
+}: {
+  children: React.ReactNode
+  onNewChat: () => void
+  sessions: Session[]
+  activeSessionId: string | undefined
+  onUpdateSession: (sessionId: string, title: string, messageCount: number) => void
+  selectedDatasourceId: string | null
+  onDatasourceChange: (id: string) => void
+}) {
+  const outlet = useOutlet()
+  
+  if (outlet && isValidElement(outlet)) {
+    return cloneElement(outlet as any, {
+      onNewChat,
+      sessions,
+      activeSessionId,
+      onUpdateSession,
+      selectedDatasourceId,
+      onDatasourceChange,
+    })
+  }
+  
+  return outlet
 }
 
 function App() {
@@ -50,10 +84,19 @@ function App() {
         onDatasourceChange={setSelectedDatasourceId}
       >
         <Routes>
-          <Route path="/" element={<NewHomePage 
-            selectedDatasourceId={selectedDatasourceId} 
+          <Route path="/" element={<AppContent 
+            onNewChat={handleNewChat}
+            sessions={sessions}
+            activeSessionId={activeSessionId}
+            onUpdateSession={handleUpdateSession}
+            selectedDatasourceId={selectedDatasourceId}
             onDatasourceChange={setSelectedDatasourceId}
-          />} />
+          >
+            <NewHomePage 
+              selectedDatasourceId={selectedDatasourceId} 
+              onDatasourceChange={setSelectedDatasourceId}
+            />
+          </AppContent>} />
           <Route path="/datasource" element={<DataSourcePage />} />
         </Routes>
       </NewAppLayout>
