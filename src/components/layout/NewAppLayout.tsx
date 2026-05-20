@@ -14,6 +14,7 @@ interface NewAppLayoutProps {
   onNewChat?: () => void
   sessions?: Session[]
   activeSessionId?: string
+  onSelectSession?: (sessionId: string) => void
   onUpdateSession?: (sessionId: string, title: string, messageCount: number) => void
   selectedDatasourceId?: string | null
   onDatasourceChange?: (id: string) => void
@@ -24,6 +25,7 @@ export default function NewAppLayout({
   onNewChat, 
   sessions = [], 
   activeSessionId,
+  onSelectSession,
   onUpdateSession,
   selectedDatasourceId = null,
   onDatasourceChange,
@@ -34,7 +36,8 @@ export default function NewAppLayout({
       <NewSidebar 
         onNewChat={onNewChat} 
         sessions={sessions} 
-        activeSessionId={activeSessionId} 
+        activeSessionId={activeSessionId}
+        onSelectSession={onSelectSession}
       />
       
       {/* 中间主内容区 */}
