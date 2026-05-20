@@ -23,7 +23,7 @@ import { handleError, generateErrorReport } from './error-handler.js'
 function initLLM() {
   const apiKey = process.env.DEEPSEEK_API_KEY || process.env.DASHSCOPE_API_KEY
   const baseUrl = process.env.DEEPSEEK_API_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1'
-  const model = process.env.DEEPSEEK_MODEL || 'deepseek-v3.2'
+  const model = process.env.DEEPSEEK_MODEL || 'deepseek-v3'
 
   console.log('[Agent] 初始化 LLM')
   console.log('  API Key:', apiKey ? `${apiKey.substring(0, 8)}...` : '未设置')

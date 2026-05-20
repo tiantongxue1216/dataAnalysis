@@ -15,7 +15,7 @@ import { createSQLDatabaseToolkit, getDefaultSystemPrompt } from './langchain-sq
 function initLLM() {
   const apiKey = process.env.DEEPSEEK_API_KEY || process.env.DASHSCOPE_API_KEY
   const baseUrl = process.env.DEEPSEEK_API_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1'
-  const model = process.env.DEEPSEEK_MODEL || 'deepseek-v3.2'
+  const model = process.env.DEEPSEEK_MODEL || 'deepseek-v3'
 
   console.log('[NL2SQL Agent] 初始化 LLM')
   console.log('  API Key:', apiKey ? `${apiKey.substring(0, 8)}...` : '未设置')
@@ -115,12 +115,16 @@ export class NL2SQLAgent {
       // 8. 提取查询结果数据
       const queryData = this.extractQueryData(result)
 
+      // 9. 提取生成的 SQL
+      const generatedSQL = this.extractGeneratedSQL(result)
+
       return {
         success: true,
         question,
         answer: finalAnswer,
         thoughts,
         data: queryData,
+        sql: generatedSQL,  // 新增：返回生成的 SQL
         iterations: result.messages?.length || 0,
         duration,
         metadata: {
@@ -203,6 +207,45 @@ export class NL2SQLAgent {
     }
 
     return thoughts
+  }
+
+  /**
+   * 提取生成的 SQL
+   */
+  extractGeneratedSQL(result) {
+    if (!result.messages) {
+      return null
+    }
+
+    // 查找 sql_db_query 工具调用中的 SQL
+    for (const message of result.messages) {
+      if (message.constructor.name === 'ToolMessage' && message.content) {
+        try {
+          const content = JSON.parse(message.content)
+          
+          // 如果包含成功执行的查询
+          if (content.success && content.data) {
+            // 从工具调用历史中找到对应的 SQL
+            const toolCall = result.messages.find(m => 
+              m.constructor.name === 'AIMessage' && 
+              m.tool_calls && 
+              m.tool_calls.some(tc => tc.name === 'sql_db_query')
+            )
+            
+            if (toolCall && toolCall.tool_calls) {
+              const sqlCall = toolCall.tool_calls.find(tc => tc.name === 'sql_db_query')
+              if (sqlCall && sqlCall.args && sqlCall.args.query) {
+                return sqlCall.args.query
+              }
+            }
+          }
+        } catch (e) {
+          // 忽略解析错误
+        }
+      }
+    }
+
+    return null
   }
 
   /**
