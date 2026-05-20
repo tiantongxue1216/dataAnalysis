@@ -409,7 +409,7 @@ export default function NewHomePage({
 
                   {/* 表格数据 / 图表 */}
                   {((message.tableData && message.tableData.length > 0) || (message.data && message.data.length > 0)) && (
-                    <div className="border border-gray-200 rounded-lg overflow-hidden" style={{ minHeight: '300px', maxHeight: '500px' }}>
+                    <div className="border border-gray-200 rounded-lg overflow-hidden" style={{ minHeight: '400px', height: '600px' }}>
                       <DataVisualization
                         data={message.tableData || message.data || []}
                         recommendation={message.chartRecommendation || message.recommendation || {

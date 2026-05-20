@@ -195,7 +195,7 @@ export default function DataVisualization({
       </div>
 
       {/* 图表容器 */}
-      <div className="flex-1 p-4">
+      <div className="flex-1 p-4 min-h-0">
         {chartOption ? (
           <ReactECharts
             option={chartOption}
