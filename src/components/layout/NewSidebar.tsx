@@ -38,7 +38,7 @@ export default function NewSidebar({
   const [activeNav, setActiveNav] = useState('simple-query')
   const [collapsedGroups, setCollapsedGroups] = useState<{[key: string]: boolean}>({
     today: false,
-    last30days: true
+    last30days: false
   })
 
   const navItems = [
@@ -51,6 +51,31 @@ export default function NewSidebar({
       [group]: !prev[group]
     }))
   }
+
+  // 根据时间分组会话
+  const groupSessionsByTime = () => {
+    const now = new Date()
+    const today: Session[] = []
+    const last30Days: Session[] = []
+
+    sessions.forEach(session => {
+      const sessionDate = new Date(session.timestamp)
+      const diffTime = now.getTime() - sessionDate.getTime()
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+
+      if (diffDays === 0) {
+        // 今天
+        today.push(session)
+      } else if (diffDays <= 30) {
+        // 最近30天
+        last30Days.push(session)
+      }
+    })
+
+    return { today, last30Days }
+  }
+
+  const { today, last30Days } = groupSessionsByTime()
 
   return (
     <aside className="w-64 bg-gray-50 border-r border-gray-200 flex flex-col">
@@ -98,53 +123,66 @@ export default function NewSidebar({
         </div>
 
         {/* 今天 */}
-        <div className="mb-2">
-          <button
-            onClick={() => toggleGroup('today')}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded"
-          >
-            <Clock className={`w-3 h-3 transition-transform ${collapsedGroups.today ? '' : 'rotate-90'}`} />
-            <span>今天</span>
-          </button>
-          {!collapsedGroups.today && (
-            <div className="ml-4 mt-1 space-y-1">
-              <button
-                onClick={() => onSelectSession?.('session-1')}
-                className="w-full text-left px-3 py-2 text-sm rounded bg-blue-50 text-blue-600"
-              >
-                <div className="truncate">2025年8月10日，开户后1年内、...</div>
-              </button>
-            </div>
-          )}
-        </div>
+        {today.length > 0 && (
+          <div className="mb-2">
+            <button
+              onClick={() => toggleGroup('today')}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded"
+            >
+              <Clock className={`w-3 h-3 transition-transform ${collapsedGroups.today ? '' : 'rotate-90'}`} />
+              <span>今天</span>
+              <span className="ml-auto text-xs text-gray-400">{today.length}</span>
+            </button>
+            {!collapsedGroups.today && (
+              <div className="ml-4 mt-1 space-y-1">
+                {today.map((session) => (
+                  <button
+                    key={session.id}
+                    onClick={() => onSelectSession?.(session.id)}
+                    className={`w-full text-left px-3 py-2 text-sm rounded transition-all ${
+                      activeSessionId === session.id
+                        ? 'bg-blue-50 text-blue-600'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="truncate">{session.title}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 最近30天 */}
-        <div>
-          <button
-            onClick={() => toggleGroup('last30days')}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded"
-          >
-            <Clock className={`w-3 h-3 transition-transform ${collapsedGroups.last30days ? '' : 'rotate-90'}`} />
-            <span>最近30天</span>
-          </button>
-          {!collapsedGroups.last30days && sessions.length > 0 && (
-            <div className="ml-4 mt-1 space-y-1">
-              {sessions.map((session) => (
-                <button
-                  key={session.id}
-                  onClick={() => onSelectSession?.(session.id)}
-                  className={`w-full text-left px-3 py-2 text-sm rounded transition-all ${
-                    activeSessionId === session.id
-                      ? 'bg-blue-50 text-blue-600'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <div className="truncate">{session.title}</div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {last30Days.length > 0 && (
+          <div>
+            <button
+              onClick={() => toggleGroup('last30days')}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded"
+            >
+              <Clock className={`w-3 h-3 transition-transform ${collapsedGroups.last30days ? '' : 'rotate-90'}`} />
+              <span>最近30天</span>
+              <span className="ml-auto text-xs text-gray-400">{last30Days.length}</span>
+            </button>
+            {!collapsedGroups.last30days && (
+              <div className="ml-4 mt-1 space-y-1">
+                {last30Days.map((session) => (
+                  <button
+                    key={session.id}
+                    onClick={() => onSelectSession?.(session.id)}
+                    className={`w-full text-left px-3 py-2 text-sm rounded transition-all ${
+                      activeSessionId === session.id
+                        ? 'bg-blue-50 text-blue-600'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <div className="truncate">{session.title}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 底部用户信息 */}
