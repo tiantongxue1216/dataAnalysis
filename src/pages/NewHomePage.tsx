@@ -71,12 +71,40 @@ export default function NewHomePage({
   onUpdateSession?: (sessionId: string, title: string, messageCount: number) => void
   onNewChat?: () => void
 }) {
-  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [messagesBySession, setMessagesBySession] = useState<{[sessionId: string]: ChatMessage[]}>({})
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [expandedThinking, setExpandedThinking] = useState<{[key: string]: boolean}>({})
   const [datasources, setDatasources] = useState<DataSource[]>([])
   const [currentChartTypes, setCurrentChartTypes] = useState<{[key: string]: string}>({})
+
+  // 获取当前活跃会话的消息
+  const messages = activeSessionId ? (messagesBySession[activeSessionId] || []) : []
+
+  // 监听 activeSessionId 变化，切换会话
+  useEffect(() => {
+    if (activeSessionId) {
+      // 如果新会话还没有消息，初始化为空数组
+      if (!messagesBySession[activeSessionId]) {
+        setMessagesBySession(prev => ({
+          ...prev,
+          [activeSessionId]: []
+        }))
+      }
+      // 清空临时状态
+      setCurrentChartTypes({})
+      setExpandedThinking({})
+    }
+  }, [activeSessionId])
+
+  // 辅助函数：添加消息到当前会话
+  const addMessageToCurrentSession = (message: ChatMessage) => {
+    if (!activeSessionId) return
+    setMessagesBySession(prev => ({
+      ...prev,
+      [activeSessionId]: [...(prev[activeSessionId] || []), message]
+    }))
+  }
 
   useEffect(() => {
     fetchDatasources()
@@ -113,7 +141,10 @@ export default function NewHomePage({
       content,
       timestamp: new Date(),
     }
-    setMessages(prev => [...prev, userMessage])
+    setMessagesBySession(prev => ({
+      ...prev,
+      [activeSessionId!]: [...(prev[activeSessionId!] || []), userMessage]
+    }))
     setInputValue('')
     setIsLoading(true)
 
@@ -129,7 +160,10 @@ export default function NewHomePage({
         content: `❌ 错误: ${error.message || '处理失败'}`,
         timestamp: new Date(),
       }
-      setMessages(prev => [...prev, errorMessage])
+      setMessagesBySession(prev => ({
+        ...prev,
+        [activeSessionId!]: [...(prev[activeSessionId!] || []), errorMessage]
+      }))
     } finally {
       setIsLoading(false)
     }
@@ -190,7 +224,10 @@ export default function NewHomePage({
         data: nl2sqlResult.data?.rows || undefined,
         recommendation: nl2sqlResult.recommendation || undefined,
       }
-      setMessages(prev => [...prev, aiMessage])
+      setMessagesBySession(prev => ({
+        ...prev,
+        [activeSessionId!]: [...(prev[activeSessionId!] || []), aiMessage]
+      }))
       
       // 更新会话标题和消息数量
       if (activeSessionId && onUpdateSession) {
@@ -211,7 +248,10 @@ export default function NewHomePage({
         duration: parseFloat(((Date.now() - startTime) / 1000).toFixed(3)),
         agentMode: true,
       }
-      setMessages(prev => [...prev, errorMessage])
+      setMessagesBySession(prev => ({
+        ...prev,
+        [activeSessionId!]: [...(prev[activeSessionId!] || []), errorMessage]
+      }))
     }
   }
 
@@ -229,15 +269,11 @@ export default function NewHomePage({
   }
 
   const handleNewChatClick = () => {
-    // 清空当前对话
-    setMessages([])
-    setCurrentChartTypes({})
-    setExpandedThinking({})
-    
-    // 调用父组件的新建会话函数
+    // 调用父组件创建新会话并切换为活跃会话
     if (onNewChat) {
       onNewChat()
     }
+    // activeSessionId 变化会触发 useEffect，自动清空消息
   }
 
   const toggleThinking = (messageId: string) => {
