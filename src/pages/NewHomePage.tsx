@@ -21,8 +21,7 @@ import {
   CheckCircle,
   AlertCircle
 } from 'lucide-react'
-import { intentApi, sqlApi, queryApi, dataSourceApi, agentApi, nl2sqlApi } from '@/services/api'
-import type { Message } from '@/types/message'
+import { dataSourceApi, nl2sqlApi } from '@/services/api'
 import type { DataSource } from '@/types/datasource'
 import DataVisualization from '@/components/chart/DataVisualization'
 
@@ -75,26 +74,11 @@ export default function NewHomePage({
   const [expandedThinking, setExpandedThinking] = useState<{[key: string]: boolean}>({})
   const [datasources, setDatasources] = useState<DataSource[]>([])
   const [currentChartTypes, setCurrentChartTypes] = useState<{[key: string]: string}>({})
-  const [useAgentMode, setUseAgentMode] = useState(false)
-  const [useNL2SQLMode, setUseNL2SQLMode] = useState(true) // 默认使用新的 NL2SQL API
-  const [availableTools, setAvailableTools] = useState<Array<{name: string; description: string}>>([])
+  const [useNL2SQLMode, setUseNL2SQLMode] = useState(true) // 始终使用 NL2SQL 模式
 
   useEffect(() => {
     fetchDatasources()
-    fetchAvailableTools()
   }, [])
-
-  const fetchAvailableTools = async () => {
-    try {
-      const result = await agentApi.getTools()
-      if (result.success) {
-        setAvailableTools(result.data)
-        console.log('Agent 可用工具:', result.data)
-      }
-    } catch (error) {
-      console.error('获取 Agent 工具列表失败:', error)
-    }
-  }
 
   // 当数据源加载后，如果没有选中的，自动选择第一个
   useEffect(() => {
@@ -136,17 +120,8 @@ export default function NewHomePage({
     try {
       const startTime = Date.now()
       
-      // 根据模式选择不同的处理逻辑
-      if (useNL2SQLMode && selectedDatasourceId) {
-        // 使用新的 NL2SQL Agent API（推荐）
-        await handleNL2SQLQuery(content, startTime)
-      } else if (useAgentMode && selectedDatasourceId) {
-        // Agent 模式：直接调用 Agent API
-        await handleAgentQuery(content, startTime)
-      } else {
-        // 传统模式：分步调用
-        await handleTraditionalQuery(content, startTime)
-      }
+      // 使用 NL2SQL Agent API
+      await handleNL2SQLQuery(content, startTime)
     } catch (error: any) {
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
@@ -161,80 +136,7 @@ export default function NewHomePage({
   }
 
   /**
-   * Agent 模式查询
-   */
-  const handleAgentQuery = async (content: string, startTime: number) => {
-    try {
-      const agentResult = await agentApi.query(
-        content,
-        selectedDatasourceId!,
-        10 // max iterations
-      )
-
-      // 检查返回结果
-      if (!agentResult || !agentResult.success) {
-        throw new Error(agentResult?.error || 'Agent 查询失败')
-      }
-
-      const duration = ((Date.now() - startTime) / 1000).toFixed(3)
-
-      // 构建思考过程，添加空值保护和去重
-      const toolResultsCount = agentResult.toolResults?.length || 0
-      let thoughts = agentResult.thoughts || []
-      
-      // 去重：移除完全相同的连续思考
-      thoughts = thoughts.filter((thought, index) => {
-        if (index === 0) return true
-        return thought !== thoughts[index - 1]
-      })
-      
-      // 格式化思考过程
-      const thinkingLines = [
-        `🤖 Agent 执行完成`,
-        `━━━━━━━━━━━━━━━━━━━━━━━`,
-        `迭代次数: ${agentResult.iterations || 0}`,
-        `工具调用: ${toolResultsCount} 次`,
-        `耗时: ${duration}秒`,
-        ``,
-        `📝 思考过程:`,
-        `───────────────────────`,
-        ...thoughts.map((t, i) => `${i + 1}. ${t}`),
-      ]
-      
-      const thinking = thinkingLines.join('\n')
-
-      const aiMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: agentResult.answer || '抱歉，未能生成回答',
-        timestamp: new Date(),
-        thinking,
-        duration: parseFloat(duration),
-        agentMode: true,
-        // 添加图表数据
-        data: agentResult.data || undefined,
-        recommendation: agentResult.recommendation || undefined,
-      }
-      setMessages(prev => [...prev, aiMessage])
-    } catch (error: any) {
-      console.error('Agent 查询失败:', error)
-      
-      // 显示错误消息
-      const errorMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: `❌ 查询失败: ${error.message || '未知错误'}`,
-        timestamp: new Date(),
-        thinking: `错误: ${error.stack || error.message}`,
-        duration: parseFloat(((Date.now() - startTime) / 1000).toFixed(3)),
-        agentMode: true,
-      }
-      setMessages(prev => [...prev, errorMessage])
-    }
-  }
-
-  /**
-   * NL2SQL Agent 模式查询（新）
+   * NL2SQL Agent 模式查询
    */
   const handleNL2SQLQuery = async (content: string, startTime: number) => {
     try {
@@ -305,102 +207,7 @@ export default function NewHomePage({
     }
   }
 
-  /**
-   * 传统模式查询
-   */
-  const handleTraditionalQuery = async (content: string, startTime: number) => {
-    let queryConditions: string[] = []
-    let tableData: Array<Record<string, any>> = []
-    let resultTitle = content
-    let recommendedQuestions: string[] = []
-    let thinking = ''
-    let chartRecommendation: ChartRecommendation | undefined
 
-    // 1. 意图识别
-    const intentResult = await intentApi.recognize(content)
-
-    if (intentResult.success && intentResult.intent) {
-      const intent = intentResult.intent
-      
-      // 构建查询条件显示
-      if (intent.conditions && intent.conditions.length > 0) {
-        intent.conditions.forEach((cond: any) => {
-          queryConditions.push(`${cond.column} ${cond.operator} ${cond.value}`)
-        })
-      }
-
-      thinking = `意图识别成功 (置信度: ${(intent.confidence * 100).toFixed(1)}%)\n` +
-        `表名: ${intent.table_name || '未指定'}\n` +
-        `查询字段: ${intent.select_columns?.join(', ') || '未指定'}`
-
-      // 2. 生成 SQL
-      if (intent.missing_slots && intent.missing_slots.length === 0) {
-        try {
-          const sqlResult = await sqlApi.generate(intent, selectedDatasourceId || undefined)
-          
-          if (sqlResult.success && sqlResult.sql) {
-            thinking += `\nSQL 生成成功 (${sqlResult.method === 'rule-based' ? '规则引擎' : 'LLM'})\n${sqlResult.sql}`
-            
-            // 3. 执行查询
-            if (selectedDatasourceId) {
-              try {
-                const queryResult = await queryApi.execute(
-                  sqlResult.sql,
-                  selectedDatasourceId,
-                  intent.intent_type
-                )
-                
-                if (queryResult.success && queryResult.data) {
-                  tableData = queryResult.data
-                  chartRecommendation = queryResult.recommendation
-                  thinking += `\n查询成功: 返回 ${queryResult.rowCount || 0} 行数据`
-                  
-                  // 根据推荐设置标题
-                  if (queryResult.recommendation?.reason) {
-                    resultTitle = queryResult.recommendation.reason
-                  }
-                } else {
-                  thinking += `\n查询失败: ${queryResult.error || '未知错误'}`
-                }
-              } catch (error: any) {
-                thinking += `\n查询执行错误: ${error.message}`
-              }
-            } else {
-              thinking += '\n请先选择数据源'
-            }
-          } else {
-            thinking += `\nSQL 生成失败: ${sqlResult.error || '未知错误'}`
-          }
-        } catch (error: any) {
-          thinking += `\nSQL 生成错误: ${error.message}`
-        }
-      } else if (intent.missing_slots && intent.missing_slots.length > 0) {
-        thinking += `\n缺失槽位: ${intent.missing_slots.join(', ')}`
-      }
-    } else if (intentResult.need_clarification) {
-      thinking = `需要更多信息: ${intentResult.message || '请提供更详细的查询信息'}`
-    } else {
-      thinking = '意图识别失败，请重试'
-    }
-
-    const duration = ((Date.now() - startTime) / 1000).toFixed(3)
-
-    // 添加AI回复消息
-    const aiMessage: ChatMessage = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: '',
-      timestamp: new Date(),
-      thinking,
-      duration: parseFloat(duration),
-      queryConditions,
-      resultTitle,
-      tableData,
-      recommendedQuestions,
-      chartRecommendation,
-    }
-    setMessages(prev => [...prev, aiMessage])
-  }
 
   const handleSampleQuestion = (question: string) => {
     handleSendMessage(question)
@@ -504,26 +311,6 @@ export default function NewHomePage({
                     }`}
                   />
                 </button>
-              </div>
-
-              {/* Agent 模式切换 */}
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg">
-                <span className="text-sm text-gray-600">Agent 模式</span>
-                <button
-                  onClick={() => setUseAgentMode(!useAgentMode)}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                    useAgentMode ? 'bg-blue-600' : 'bg-gray-300'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      useAgentMode ? 'translate-x-4' : 'translate-x-0.5'
-                    }`}
-                  />
-                </button>
-                {useAgentMode && (
-                  <Sparkles className="w-4 h-4 text-blue-600" />
-                )}
               </div>
 
               <div className="flex-1"></div>
@@ -741,26 +528,6 @@ export default function NewHomePage({
           
           {/* 底部工具栏 */}
           <div className="flex items-center gap-3 mt-3">
-            {/* Agent 模式切换 */}
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-100 rounded-lg">
-              <span className="text-sm text-gray-600">Agent 模式</span>
-              <button
-                onClick={() => setUseAgentMode(!useAgentMode)}
-                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                  useAgentMode ? 'bg-blue-600' : 'bg-gray-300'
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    useAgentMode ? 'translate-x-4' : 'translate-x-0.5'
-                  }`}
-                />
-              </button>
-              {useAgentMode && (
-                <Sparkles className="w-4 h-4 text-blue-600" />
-              )}
-            </div>
-
             {/* 数据源选择器 */}
             <div className="relative">
               <select

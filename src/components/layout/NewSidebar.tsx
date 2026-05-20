@@ -42,13 +42,7 @@ export default function NewSidebar({
   })
 
   const navItems = [
-    { id: 'insight', icon: BarChart3, label: '数据洞察' },
-    { id: 'simple-query', icon: MessageSquare, label: '简单查询', active: true },
-    { id: 'sql-query', icon: Code2, label: 'SQL查询' },
-    { id: 'agents', icon: Blocks, label: '更多智能体' },
-    { id: 'models', icon: Sparkles, label: '数据模型广场' },
-    { id: 'aichat', icon: Sparkles, label: 'AiChat V5' },
-    { id: 'favorites', icon: Star, label: '我的收藏夹' },
+    { id: 'simple-query', icon: MessageSquare, label: '智能查询', active: true },
   ]
 
   const toggleGroup = (group: string) => {
