@@ -210,6 +210,7 @@ export default function NewHomePage({
           },
           onComplete: (result: any) => {
             console.log('[Stream] 查询完成:', result)
+            console.log('[Stream] stepsRef.current 中的步骤:', JSON.stringify(stepsRef.current.map(s => ({ id: s.id, status: s.status }))))
             
             const duration = ((Date.now() - startTime) / 1000).toFixed(3)
             

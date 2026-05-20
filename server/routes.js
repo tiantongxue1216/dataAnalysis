@@ -679,10 +679,12 @@ app.post('/api/nl2sql/query/stream', async (req, res) => {
       maxIterations: max_iterations || 10,
       onStep: (step) => {
         // 实时推送每个执行步骤
+        console.log('[NL2SQL Stream API] 发送步骤:', step.id, step.status)
         sendEvent('step', step)
       }
     })
 
+    console.log('[NL2SQL Stream API] 查询完成，发送最终结果')
     // 发送最终结果
     sendEvent('complete', result)
     res.end()

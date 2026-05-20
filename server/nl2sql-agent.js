@@ -505,8 +505,9 @@ export class NL2SQLAgent {
       }
 
       // 更新 ReAct 模式为完成状态
+      console.log('[NL2SQL Agent] 准备发送 ReAct completed 状态')
       if (onStep) {
-        onStep({
+        const completedStep = {
           id: 'react-mode',
           title: 'ReAct模式',
           status: 'completed',
@@ -514,7 +515,11 @@ export class NL2SQLAgent {
           details: 'ReAct 循环执行完成',
           collapsible: true,
           children: reactChildren
-        })
+        }
+        console.log('[NL2SQL Agent] 发送步骤:', JSON.stringify(completedStep, null, 2))
+        onStep(completedStep)
+      } else {
+        console.log('[NL2SQL Agent] onStep 回调不存在')
       }
 
       const duration = Date.now() - startTime

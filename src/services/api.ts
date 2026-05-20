@@ -400,6 +400,7 @@ export const nl2sqlApi = {
 
         const decoder = new TextDecoder()
         let buffer = ''
+        let currentEvent: string | null = null
 
         while (true) {
           const { done, value } = await reader.read()
@@ -410,33 +411,37 @@ export const nl2sqlApi = {
 
           buffer += decoder.decode(value, { stream: true })
           
-          // 处理 SSE 事件
+          // 按行分割
           const lines = buffer.split('\n')
           buffer = lines.pop() || '' // 保留最后一行（可能不完整）
 
           for (const line of lines) {
-            if (line.startsWith('event: ')) {
-              const eventType = line.slice(7)
+            const trimmedLine = line.trim()
+            
+            if (trimmedLine.startsWith('event: ')) {
+              currentEvent = trimmedLine.slice(7)
+            } else if (trimmedLine.startsWith('data: ')) {
+              const dataStr = trimmedLine.slice(6)
               
-              // 读取下一行获取数据
-              const dataLineIndex = lines.indexOf(line) + 1
-              if (dataLineIndex < lines.length && lines[dataLineIndex].startsWith('data: ')) {
-                const dataStr = lines[dataLineIndex].slice(6)
+              try {
+                const data = JSON.parse(dataStr)
                 
-                try {
-                  const data = JSON.parse(dataStr)
-                  
-                  if (eventType === 'step' && options?.onStep) {
-                    options.onStep(data)
-                  } else if (eventType === 'complete' && options?.onComplete) {
-                    options.onComplete(data)
-                  } else if (eventType === 'error' && options?.onError) {
-                    options.onError(new Error(data.error))
-                  }
-                } catch (e) {
-                  console.error('解析 SSE 数据失败:', e)
+                if (currentEvent === 'step' && options?.onStep) {
+                  console.log('[API] 收到 step 事件:', data.id, data.status)
+                  options.onStep(data)
+                } else if (currentEvent === 'complete' && options?.onComplete) {
+                  console.log('[API] 收到 complete 事件')
+                  options.onComplete(data)
+                } else if (currentEvent === 'error' && options?.onError) {
+                  console.log('[API] 收到 error 事件:', data.error)
+                  options.onError(new Error(data.error))
                 }
+              } catch (e) {
+                console.error('解析 SSE 数据失败:', e, 'data:', dataStr)
               }
+            } else if (trimmedLine === '') {
+              // 空行表示一个完整的事件结束
+              // 不在这里重置 currentEvent，因为下一个事件会覆盖它
             }
           }
         }
