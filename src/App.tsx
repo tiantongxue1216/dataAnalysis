@@ -17,6 +17,7 @@ function App() {
   const [selectedDatasourceId, setSelectedDatasourceId] = useState<string | null>(null)
 
   const handleNewChat = () => {
+    console.log('[App] 创建新会话')
     const newSession: Session = {
       id: Date.now().toString(),
       title: `新会话 ${sessions.length + 1}`,
@@ -25,6 +26,7 @@ function App() {
     }
     setSessions(prev => [newSession, ...prev])
     setActiveSessionId(newSession.id)
+    console.log('[App] 新会话 ID:', newSession.id)
   }
 
   const handleUpdateSession = (sessionId: string, title: string, messageCount: number) => {

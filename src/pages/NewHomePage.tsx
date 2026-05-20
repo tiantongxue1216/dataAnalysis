@@ -269,9 +269,13 @@ export default function NewHomePage({
   }
 
   const handleNewChatClick = () => {
+    console.log('[NewHomePage] 点击新建对话, onNewChat:', !!onNewChat)
     // 调用父组件创建新会话并切换为活跃会话
     if (onNewChat) {
       onNewChat()
+      console.log('[NewHomePage] 已调用 onNewChat')
+    } else {
+      console.warn('[NewHomePage] onNewChat 未定义')
     }
     // activeSessionId 变化会触发 useEffect，自动清空消息
   }
