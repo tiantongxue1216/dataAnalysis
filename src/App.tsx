@@ -1,4 +1,4 @@
-import { useState, cloneElement, isValidElement, Children } from 'react'
+import { useState, cloneElement, isValidElement, Children, useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import NewAppLayout from './components/layout/NewAppLayout'
 import NewHomePage from './pages/NewHomePage'
@@ -49,6 +49,22 @@ function App() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [activeSessionId, setActiveSessionId] = useState<string | undefined>()
   const [selectedDatasourceId, setSelectedDatasourceId] = useState<string | null>(null)
+  const [isInitialized, setIsInitialized] = useState(false)
+
+  // 页面首次加载时自动创建第一个会话
+  useEffect(() => {
+    if (!isInitialized && sessions.length === 0) {
+      const firstSession: Session = {
+        id: Date.now().toString(),
+        title: '新会话 1',
+        timestamp: new Date(),
+        messageCount: 0,
+      }
+      setSessions([firstSession])
+      setActiveSessionId(firstSession.id)
+      setIsInitialized(true)
+    }
+  }, [isInitialized, sessions.length])
 
   const handleNewChat = () => {
     console.log('[App] 创建新会话')
