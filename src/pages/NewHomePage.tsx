@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { 
   MessageSquare, 
   ArrowRight, 
-  Database,
   Send,
   Sparkles,
   RotateCw,
@@ -15,11 +14,7 @@ import {
   MessageCircle,
   ChevronRight,
   ChevronDown,
-  User,
-  Bot,
-  Clock,
-  CheckCircle,
-  AlertCircle
+  Code2
 } from 'lucide-react'
 import { dataSourceApi, nl2sqlApi } from '@/services/api'
 import type { DataSource } from '@/types/datasource'
@@ -51,6 +46,8 @@ interface ChatMessage {
   // Agent 模式的图表数据
   data?: Array<Record<string, any>>
   recommendation?: ChartRecommendation
+  // NL2SQL 生成的 SQL 语句
+  sql?: string
 }
 
 const sampleQuestions = [
@@ -185,6 +182,7 @@ export default function NewHomePage({
         thinking,
         duration: parseFloat(duration),
         agentMode: true,
+        sql: nl2sqlResult.sql || undefined,  // 保存生成的 SQL
         // 添加图表数据
         data: nl2sqlResult.data?.rows || undefined,
         recommendation: nl2sqlResult.recommendation || undefined,
@@ -392,6 +390,21 @@ export default function NewHomePage({
                     </div>
                   )}
 
+                  {/* 生成的 SQL */}
+                  {message.sql && (
+                    <div className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div className="px-4 py-2.5 bg-gray-100 border-b border-gray-200">
+                        <div className="flex items-center gap-2 text-sm text-gray-700">
+                          <Code2 className="w-4 h-4 text-green-600" />
+                          <span className="font-medium">生成的 SQL</span>
+                        </div>
+                      </div>
+                      <div className="px-4 py-3 bg-gray-50">
+                        <pre className="text-sm text-gray-900 font-mono whitespace-pre-wrap break-all">{message.sql}</pre>
+                      </div>
+                    </div>
+                  )}
+
                   {/* AI 回答内容 */}
                   {message.content && (
                     <div className="bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
@@ -527,39 +540,7 @@ export default function NewHomePage({
           </div>
           
           {/* 底部工具栏 */}
-          <div className="flex items-center gap-3 mt-3">
-            {/* 数据源选择器 */}
-            <div className="relative">
-              <select
-                value={selectedDatasourceId || ''}
-                onChange={(e) => onDatasourceChange?.(e.target.value)}
-                className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1.5 bg-transparent border-none focus:outline-none cursor-pointer appearance-none pr-6"
-                style={{
-                  backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e")`,
-                  backgroundPosition: 'right 0.25rem center',
-                  backgroundRepeat: 'no-repeat',
-                  backgroundSize: '1.25em 1.25em',
-                }}
-              >
-                <option value="" disabled>选择数据源</option>
-                {datasources.map(ds => (
-                  <option key={ds.id} value={ds.id}>
-                    {ds.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1.5">
-              <MessageCircle className="w-4 h-4" />
-              <span>推荐问句</span>
-              <ChevronDown className="w-3 h-3" />
-            </button>
-            <button className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1.5">
-              <Clock className="w-4 h-4" />
-              <span>最近问句</span>
-              <ChevronDown className="w-3 h-3" />
-            </button>
-            <div className="flex-1"></div>
+          <div className="flex items-center justify-end gap-3 mt-3">
             <button className="px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-1.5">
               <MessageSquare className="w-4 h-4" />
               <span>新建对话</span>
