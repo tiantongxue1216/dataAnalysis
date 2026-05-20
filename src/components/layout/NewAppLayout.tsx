@@ -26,8 +26,6 @@ export default function NewAppLayout({
   selectedDatasourceId = null,
   onDatasourceChange,
 }: NewAppLayoutProps) {
-  const [selectedTable, setSelectedTable] = useState<string>('')
-
   return (
     <div className="h-screen w-screen flex bg-white">
       {/* 左侧边栏 */}
@@ -42,7 +40,6 @@ export default function NewAppLayout({
         {Children.map(children, child => {
           if (isValidElement(child)) {
             return cloneElement(child as any, { 
-              selectedTable,
               selectedDatasourceId 
             })
           }
@@ -51,7 +48,7 @@ export default function NewAppLayout({
       </main>
       
       {/* 右侧数据树面板 */}
-      <DataTreePanel onSelectTable={setSelectedTable} />
+      <DataTreePanel selectedDatasourceId={selectedDatasourceId} />
     </div>
   )
 }

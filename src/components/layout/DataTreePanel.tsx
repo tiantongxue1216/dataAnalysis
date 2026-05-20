@@ -3,170 +3,105 @@ import {
   Database, 
   ChevronRight, 
   ChevronDown, 
-  Calendar, 
-  Table, 
+  Table,
   Hash,
-  Folder,
-  BarChart3,
-  Loader2
+  Loader2,
+  AlertCircle
 } from 'lucide-react'
-import { schemaApi } from '@/services/api'
+import { dataSourceApi } from '@/services/api'
+import type { DataSource } from '@/types/datasource'
 
-interface TreeNode {
-  id: string
-  label: string
-  type: 'folder' | 'table' | 'dimension' | 'measure' | 'field' | 'time'
-  children?: TreeNode[]
-  icon?: any
-  description?: string
-  aggregation?: string
+interface TableInfo {
+  name?: string
+  table_name?: string
+  columns: Array<{
+    name: string
+    type: string
+    nullable: boolean
+    primaryKey: boolean
+  }>
 }
 
 interface DataTreePanelProps {
-  onSelectTable?: (tableName: string) => void
+  selectedDatasourceId: string | null
 }
 
-export default function DataTreePanel({ onSelectTable }: DataTreePanelProps) {
-  const [selectedModel, setSelectedModel] = useState('all-models')
-  const [collapsedNodes, setCollapsedNodes] = useState<{[key: string]: boolean}>({})
-  const [treeData, setTreeData] = useState<TreeNode[]>([])
-  const [loading, setLoading] = useState(true)
-  const [selectedTable, setSelectedTable] = useState<string>('')
+export default function DataTreePanel({ selectedDatasourceId }: DataTreePanelProps) {
+  const [datasources, setDatasources] = useState<DataSource[]>([])
+  const [selectedDatasource, setSelectedDatasource] = useState<DataSource | null>(null)
+  const [tables, setTables] = useState<TableInfo[]>([])
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string>('')
+  const [collapsedTables, setCollapsedTables] = useState<{[key: string]: boolean}>({})
 
+  // 加载数据源列表
   useEffect(() => {
-    fetchSchemaData()
+    fetchDatasources()
   }, [])
 
-  const fetchSchemaData = async () => {
+  // 当外部选择的数据源变化时，同步更新
+  useEffect(() => {
+    if (selectedDatasourceId && datasources.length > 0) {
+      const ds = datasources.find(d => d.id === selectedDatasourceId)
+      if (ds && ds.id !== selectedDatasource?.id) {
+        setSelectedDatasource(ds)
+        fetchTables(ds)
+      }
+    }
+  }, [selectedDatasourceId, datasources])
+
+  const fetchDatasources = async () => {
     try {
-      setLoading(true)
-      const result = await schemaApi.getSchema()
+      const result = await dataSourceApi.getAll()
       if (result.success) {
-        const trees = buildTreeFromSchema(result.data.tables)
-        setTreeData(trees)
-        // 默认选择第一个表
-        if (trees.length > 0 && trees[0].id.startsWith('table-')) {
-          const tableName = trees[0].id.replace('table-', '')
-          setSelectedTable(tableName)
-          onSelectTable?.(tableName)
+        setDatasources(result.data)
+        // 如果没有选中数据源，默认选择第一个
+        if (!selectedDatasourceId && result.data.length > 0) {
+          setSelectedDatasource(result.data[0])
+          fetchTables(result.data[0])
         }
       }
     } catch (error) {
-      console.error('获取 Schema 数据失败:', error)
+      console.error('获取数据源失败:', error)
+      setError('获取数据源失败')
+    }
+  }
+
+  const fetchTables = async (datasource: DataSource) => {
+    try {
+      setLoading(true)
+      setError('')
+      const result = await dataSourceApi.getMetadata(datasource)
+      if (result.success && result.data) {
+        // 从元数据中提取表信息
+        const tableList = result.data.tables || []
+        setTables(tableList)
+      } else {
+        setError('获取表信息失败')
+        setTables([])
+      }
+    } catch (error: any) {
+      console.error('获取表信息失败:', error)
+      setError(error.message || '获取表信息失败')
+      setTables([])
     } finally {
       setLoading(false)
     }
   }
 
-  const handleTableSelect = (tableName: string) => {
-    setSelectedTable(tableName)
-    onSelectTable?.(tableName)
+  const handleDatasourceChange = (datasourceId: string) => {
+    const ds = datasources.find(d => d.id === datasourceId)
+    if (ds) {
+      setSelectedDatasource(ds)
+      fetchTables(ds)
+    }
   }
 
-  const buildTreeFromSchema = (tables: any[]): TreeNode[] => {
-    return tables.map(table => ({
-      id: `table-${table.name}`,
-      label: table.description || table.name,
-      type: 'table',
-      icon: Table,
-      description: table.description,
-      children: [
-        // 维度节点
-        ...(table.dimensions.length > 0 ? [{
-          id: `table-${table.name}-dimensions`,
-          label: '维度',
-          type: 'folder' as const,
-          icon: Folder,
-          children: table.dimensions.map((dim: any) => ({
-            id: `table-${table.name}-dim-${dim.name}`,
-            label: dim.description || dim.name,
-            type: 'dimension' as const,
-            icon: Hash,
-            description: dim.description,
-          }))
-        }] : []),
-        // 度量节点
-        ...(table.measures.length > 0 ? [{
-          id: `table-${table.name}-measures`,
-          label: '度量',
-          type: 'folder' as const,
-          icon: Folder,
-          children: table.measures.map((measure: any) => ({
-            id: `table-${table.name}-measure-${measure.name}`,
-            label: measure.name,
-            type: 'measure' as const,
-            icon: BarChart3,
-            description: measure.description,
-            aggregation: measure.aggregation,
-          }))
-        }] : []),
-        // 时间字段节点
-        ...(table.timeFields.length > 0 ? [{
-          id: `table-${table.name}-timefields`,
-          label: '时间字段',
-          type: 'folder' as const,
-          icon: Folder,
-          children: table.timeFields.map((tf: any) => ({
-            id: `table-${table.name}-time-${tf.name}`,
-            label: tf.description || tf.name,
-            type: 'time' as const,
-            icon: Calendar,
-            description: tf.description,
-          }))
-        }] : [])
-      ].filter(Boolean) as TreeNode[]
-    }))
-  }
-
-  const toggleNode = (id: string) => {
-    setCollapsedNodes(prev => ({
+  const toggleTable = (tableName: string) => {
+    setCollapsedTables(prev => ({
       ...prev,
-      [id]: !prev[id]
+      [tableName]: !prev[tableName]
     }))
-  }
-
-  const renderTreeNode = (node: TreeNode, depth: number = 0) => {
-    const isCollapsed = collapsedNodes[node.id]
-    const hasChildren = node.children && node.children.length > 0
-    const Icon = node.icon || Folder
-    const isSelected = node.type === 'table' && node.id.replace('table-', '') === selectedTable
-
-    return (
-      <div key={node.id}>
-        <button
-          onClick={() => {
-            if (node.type === 'table') {
-              const tableName = node.id.replace('table-', '')
-              handleTableSelect(tableName)
-            } else if (hasChildren) {
-              toggleNode(node.id)
-            }
-          }}
-          className={`w-full flex items-center gap-2 py-1.5 px-2 text-sm text-left transition-colors ${
-            isSelected
-              ? 'bg-blue-100 text-blue-700 font-medium'
-              : node.type === 'table'
-                ? 'hover:bg-gray-50 text-gray-900 font-medium cursor-pointer'
-                : 'hover:bg-gray-50 text-gray-700 cursor-default'
-          }`}
-          style={{ paddingLeft: `${depth * 16 + 8}px` }}
-        >
-          {hasChildren ? (
-            <ChevronRight className={`w-3 h-3 text-gray-400 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} />
-          ) : (
-            <span className="w-3"></span>
-          )}
-          <Icon className="w-4 h-4 text-gray-600" />
-          <span className="text-gray-700 truncate">{node.label}</span>
-        </button>
-        
-        {hasChildren && !isCollapsed && (
-          <div>
-            {node.children!.map(child => renderTreeNode(child, depth + 1))}
-          </div>
-        )}
-      </div>
-    )
   }
 
   return (
@@ -175,34 +110,120 @@ export default function DataTreePanel({ onSelectTable }: DataTreePanelProps) {
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center gap-2">
           <Database className="w-5 h-5 text-gray-700" />
-          <h3 className="text-base font-semibold text-gray-900">数据</h3>
+          <h3 className="text-base font-semibold text-gray-900">数据库</h3>
         </div>
       </div>
 
-      {/* 数据模型选择器 */}
+      {/* 数据库选择器 */}
       <div className="p-3 border-b border-gray-200">
+        <label className="block text-xs font-medium text-gray-600 mb-1.5">
+          选择数据库
+        </label>
         <select
-          value={selectedModel}
-          onChange={(e) => setSelectedModel(e.target.value)}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          value={selectedDatasource?.id || ''}
+          onChange={(e) => handleDatasourceChange(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
         >
-          <option value="bank-loan-model">银行存贷款业务模型</option>
-          <option value="retail-model">零售业务模型</option>
-          <option value="corporate-model">对公业务模型</option>
+          <option value="" disabled>
+            请选择数据库
+          </option>
+          {datasources.map(ds => (
+            <option key={ds.id} value={ds.id}>
+              {ds.name} ({ds.type})
+            </option>
+          ))}
         </select>
       </div>
 
-      {/* 数据树 */}
+      {/* 数据模型选择器（当前选中的数据库） */}
+      {selectedDatasource && (
+        <div className="p-3 border-b border-gray-200 bg-blue-50">
+          <label className="block text-xs font-medium text-blue-800 mb-1.5">
+            当前数据库
+          </label>
+          <div className="flex items-center gap-2 px-3 py-2 bg-white rounded-lg border border-blue-200">
+            <Database className="w-4 h-4 text-blue-600" />
+            <span className="text-sm text-blue-900 font-medium truncate">
+              {selectedDatasource.name}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* 表和字段列表 */}
       <div className="flex-1 overflow-y-auto py-2">
         {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <Loader2 className="w-5 h-5 text-gray-400 animate-spin" />
+          <div className="flex flex-col items-center justify-center py-12 gap-3">
+            <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
+            <span className="text-sm text-gray-500">加载表结构...</span>
           </div>
-        ) : treeData.length > 0 ? (
-          treeData.map(node => renderTreeNode(node))
+        ) : error ? (
+          <div className="flex flex-col items-center justify-center py-12 gap-3 px-4">
+            <AlertCircle className="w-6 h-6 text-red-500" />
+            <span className="text-sm text-red-600 text-center">{error}</span>
+          </div>
+        ) : tables.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 gap-3 px-4">
+            <Database className="w-8 h-8 text-gray-300" />
+            <span className="text-sm text-gray-400 text-center">
+              {selectedDatasource ? '该数据库没有表' : '请先选择数据库'}
+            </span>
+          </div>
         ) : (
-          <div className="text-center py-8 text-sm text-gray-400">
-            暂无数据
+          <div className="space-y-1">
+            {tables.map((table) => {
+              const tableName = table.name || table.table_name || '未知表'
+              const isCollapsed = collapsedTables[tableName]
+              const columns = table.columns || []
+              
+              return (
+                <div key={tableName} className="border-b border-gray-100 last:border-b-0">
+                  {/* 表名 */}
+                  <button
+                    onClick={() => toggleTable(tableName)}
+                    className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-left hover:bg-gray-50 transition-colors"
+                  >
+                    <ChevronRight 
+                      className={`w-4 h-4 text-gray-400 transition-transform ${
+                        isCollapsed ? '' : 'rotate-90'
+                      }`} 
+                    />
+                    <Table className="w-4 h-4 text-blue-600" />
+                    <span className="text-gray-900 font-medium truncate">
+                      {tableName}
+                    </span>
+                    <span className="ml-auto text-xs text-gray-400">
+                      {columns.length} 字段
+                    </span>
+                  </button>
+
+                  {/* 字段列表 */}
+                  {!isCollapsed && columns.length > 0 && (
+                    <div className="bg-gray-50 py-1">
+                      {columns.map((col) => (
+                        <div
+                          key={col.name}
+                          className="flex items-center gap-2 px-3 py-1.5 pl-10 text-xs"
+                        >
+                          <Hash className="w-3 h-3 text-gray-400 flex-shrink-0" />
+                          <span className="text-gray-700 truncate flex-1">
+                            {col.name}
+                          </span>
+                          <span className="text-gray-400 font-mono text-[10px]">
+                            {col.type}
+                          </span>
+                          {col.primaryKey && (
+                            <span className="px-1.5 py-0.5 bg-yellow-100 text-yellow-700 rounded text-[10px] font-medium">
+                              PK
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
