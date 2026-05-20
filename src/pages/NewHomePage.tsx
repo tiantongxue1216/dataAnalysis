@@ -226,14 +226,6 @@ export default function NewHomePage({
   if (messages.length === 0) {
     return (
       <div className="h-full flex flex-col bg-white">
-        {/* 顶部标题 */}
-        <div className="px-6 py-4 border-b border-gray-100">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-blue-600" />
-            <h2 className="text-lg font-semibold text-gray-900">简单查询</h2>
-          </div>
-        </div>
-
         {/* 欢迎内容 */}
         <div className="flex-1 flex flex-col items-center justify-center px-6">
           <div className="max-w-3xl w-full text-center mb-12">
