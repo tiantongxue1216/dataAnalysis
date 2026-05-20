@@ -35,31 +35,82 @@ export default function DataVisualization({
   currentChartType,
   onChartTypeChange,
 }: DataVisualizationProps) {
+  // 智能推断 xAxis 和 yAxis（如果 recommendation 中没有）
+  const inferredAxes = useMemo(() => {
+    if (!data || data.length === 0) return { xAxis: null, yAxis: null }
+
+    const columns = Object.keys(data[0])
+    
+    // 如果 recommendation 中已有，直接使用
+    if (recommendation.xAxis && recommendation.yAxis) {
+      return {
+        xAxis: recommendation.xAxis,
+        yAxis: Array.isArray(recommendation.yAxis) ? recommendation.yAxis[0] : recommendation.yAxis,
+      }
+    }
+
+    // 否则尝试智能推断
+    if (columns.length >= 2) {
+      // 找到第一个可能是分类/时间的列作为 xAxis
+      let xAxisCol = columns[0]
+      // 找到第一个数值列作为 yAxis
+      let yAxisCol = columns[1]
+
+      // 检查数据类型
+      for (const col of columns) {
+        const sampleValue = data[0][col]
+        if (typeof sampleValue === 'number' || !isNaN(Number(sampleValue))) {
+          // 这是数值列
+          if (!yAxisCol) yAxisCol = col
+        } else {
+          // 这是分类/文本列
+          if (xAxisCol === columns[0] || typeof data[0][xAxisCol] === 'number') {
+            xAxisCol = col
+          }
+        }
+      }
+
+      return { xAxis: xAxisCol, yAxis: yAxisCol }
+    }
+
+    return { xAxis: columns[0], yAxis: columns[1] }
+  }, [data, recommendation])
+
   // 图表配置
   const chartOption = useMemo(() => {
     if (!data || data.length === 0) return null
 
     const { xAxis, yAxis, groupBy } = recommendation
+    const { xAxis: inferredX, yAxis: inferredY } = inferredAxes
+
+    // 使用 recommendation 中的字段，如果没有则使用推断的字段
+    const finalXAxis = xAxis || inferredX || undefined
+    // yAxis 可能是字符串或数组，需要统一处理
+    const finalYAxisSingle = Array.isArray(yAxis) ? yAxis[0] : (yAxis || inferredY || undefined)
 
     switch (currentChartType) {
       case 'line':
-        return getLineChartOption(data, xAxis, Array.isArray(yAxis) ? yAxis[0] : yAxis)
+        return getLineChartOption(data, finalXAxis, finalYAxisSingle)
       case 'bar':
-        return getBarChartOption(data, xAxis, Array.isArray(yAxis) ? yAxis[0] : yAxis)
+        return getBarChartOption(data, finalXAxis, finalYAxisSingle)
       case 'horizontal_bar':
-        return getHorizontalBarChartOption(data, xAxis, Array.isArray(yAxis) ? yAxis[0] : yAxis)
+        return getHorizontalBarChartOption(data, finalXAxis, finalYAxisSingle)
       case 'pie':
-        return getPieChartOption(data, xAxis, Array.isArray(yAxis) ? yAxis[0] : yAxis)
+        return getPieChartOption(data, finalXAxis, finalYAxisSingle)
       case 'scatter':
-        return getScatterChartOption(data, xAxis, Array.isArray(yAxis) ? yAxis[0] : yAxis)
+        return getScatterChartOption(data, finalXAxis, finalYAxisSingle)
       case 'grouped_bar':
-        return getGroupedBarChartOption(data, xAxis, Array.isArray(yAxis) ? yAxis[0] : yAxis, groupBy)
+        return getGroupedBarChartOption(data, finalXAxis, finalYAxisSingle, groupBy || recommendation.groupBy)
       case 'stacked_bar':
-        return getStackedBarChartOption(data, xAxis, yAxis)
+        // yAxis 可能是数组，直接使用；否则使用推断的单值
+        const stackedYAxis = Array.isArray(yAxis) 
+          ? yAxis.filter((v): v is string => typeof v === 'string')
+          : (yAxis ? [yAxis] : (finalYAxisSingle ? [finalYAxisSingle] : []))
+        return getStackedBarChartOption(data, finalXAxis, stackedYAxis)
       default:
         return null
     }
-  }, [data, recommendation, currentChartType])
+  }, [data, recommendation, currentChartType, inferredAxes])
 
   // 表格渲染
   if (currentChartType === 'table' || !chartOption) {

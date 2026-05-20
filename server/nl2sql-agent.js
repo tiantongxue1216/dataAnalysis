@@ -118,6 +118,23 @@ export class NL2SQLAgent {
       // 9. 提取生成的 SQL
       const generatedSQL = this.extractGeneratedSQL(result)
 
+      // 10. 生成图表推荐（如果有数据）
+      let chartRecommendation = null
+      if (queryData && queryData.length > 0) {
+        try {
+          const { recommendChart } = await import('./chart-recommender.js')
+          chartRecommendation = recommendChart(queryData, null)
+        } catch (error) {
+          console.warn('[NL2SQL] 图表推荐失败:', error.message)
+          chartRecommendation = {
+            chartType: 'table',
+            reason: '图表推荐失败',
+            canRender: false,
+            message: error.message,
+          }
+        }
+      }
+
       return {
         success: true,
         question,
@@ -125,6 +142,7 @@ export class NL2SQLAgent {
         thoughts,
         data: queryData,
         sql: generatedSQL,  // 新增：返回生成的 SQL
+        recommendation: chartRecommendation,  // 新增：图表推荐
         iterations: result.messages?.length || 0,
         duration,
         metadata: {

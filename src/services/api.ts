@@ -308,6 +308,7 @@ export const nl2sqlApi = {
       question: string
       answer: string
       thoughts: string[]
+      sql?: string  // 新增：生成的 SQL 语句
       data?: {
         rows: Array<Record<string, any>>
         rowCount: number
